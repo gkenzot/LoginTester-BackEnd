@@ -130,7 +130,6 @@ public class AuthController {
 	public ResponseEntity<Map<String, Object>> checkAuth(
 	    @CookieValue(name = "jwt", required = false) String token) {
 	    
-	    // Se não houver token no cookie
 	    if (token == null || token.isEmpty()) {
 	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 	            .body(Map.of(
@@ -139,7 +138,6 @@ public class AuthController {
 	            ));
 	    }
 
-	    // Valida o token
 	    String userEmail = tokenService.validateToken(token);
 	    if (userEmail.isEmpty()) {
 	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -149,11 +147,15 @@ public class AuthController {
 	            ));
 	    }
 
-	    // Se chegou aqui, o token é válido
+	    User user = userRepository.findByEmail(userEmail)
+	        .orElseThrow(() -> new ResponseStatusException(
+	            HttpStatus.UNAUTHORIZED, "Usuário não encontrado"));
+
 	    return ResponseEntity.ok()
 	        .body(Map.of(
 	            "authenticated", true,
-	            "user", userEmail
+	            "user", userEmail,
+	            "role", user.getRole().name() // Isso vai retornar "ADMIN", "USER", etc.
 	        ));
 	}
 	
