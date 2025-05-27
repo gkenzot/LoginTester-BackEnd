@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: login-auth-api
+    env: java
+    buildCommand: ./mvnw clean package
+    startCommand: java -jar target/login-auth-api-0.0.1-SNAPSHOT.jar
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRATION
+        value: "86400000"
+      - key: SSL_KEYSTORE_PASSWORD
+        sync: false
+      - key: APP_CORS_ALLOWED_ORIGINS
+        value: "http://localhost:5173,https://localhost:5173,https://seu-frontend.onrender.com"
+      - key: APP_CORS_ALLOWED_METHODS
+        value: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - key: APP_CORS_ALLOWED_HEADERS
+        value: "*"
+      - key: APP_CORS_ALLOW_CREDENTIALS
+        value: "true"
+      - key: APP_CORS_MAX_AGE
+        value: "3600" 
