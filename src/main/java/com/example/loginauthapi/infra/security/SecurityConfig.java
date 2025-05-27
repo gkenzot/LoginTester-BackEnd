@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -29,7 +30,15 @@ public class SecurityConfig {
 	) throws Exception {
 	    http
 	        // Configuração CORS
-	        .cors(cors -> cors.configurationSource(corsConfigurationSource))
+	        .cors(cors -> cors.configurationSource(request -> {
+	            var corsConfig = new org.springframework.web.cors.CorsConfiguration();
+	            corsConfig.setAllowedOrigins(List.of("https://localhost:5173"));
+	            corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+	            corsConfig.setAllowedHeaders(List.of("*"));
+	            corsConfig.setAllowCredentials(true);
+	            corsConfig.setMaxAge(3600L);
+	            return corsConfig;
+	        }))
 	        
 	        // Configuração CSRF (desabilitado para APIs stateless)
 	        .csrf(csrf -> csrf.disable())
@@ -46,7 +55,9 @@ public class SecurityConfig {
 	                "/auth/**",
 	                "/swagger-ui.html",
 	                "/swagger-ui/**",
-	                "/v3/api-docs/**"
+	                "/v3/api-docs/**",
+	                "/swagger-resources/**",
+	                "/webjars/**"
 	            ).permitAll()
 	            
 	            // Todas outras requisições exigem autenticação

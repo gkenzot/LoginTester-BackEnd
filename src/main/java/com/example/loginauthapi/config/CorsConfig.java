@@ -17,34 +17,12 @@ public class CorsConfig {
 	CorsConfigurationSource corsConfigurationSource() {
 	    CorsConfiguration configuration = new CorsConfiguration();
 	    
-	    // Origens controladas (evite "*" em produção)
-	    configuration.setAllowedOrigins(List.of(
-	        "http://localhost:5173",
-	        "https://seusite.com" // Adicione seu domínio de produção
-	    ));
-	    
-	    // Métodos específicos
-	    configuration.setAllowedMethods(List.of(
-	        "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
-	    ));
-	    
-	    // Headers explícitos
-	    configuration.setAllowedHeaders(List.of(
-	        "Authorization",
-	        "Content-Type",
-	        "X-Requested-With",
-	        "Accept",
-	        "Origin"
-	    ));
-	    
-	    // Headers expostos para o frontend
-	    configuration.setExposedHeaders(List.of(
-	        "Authorization",
-	        "X-Custom-Header"
-	    ));
-	    
+	    // Configuração simplificada para teste
+	    configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+	    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+	    configuration.setAllowedHeaders(List.of("*"));
 	    configuration.setAllowCredentials(true);
-	    configuration.setMaxAge(3600L); // Cache de 1 hora
+	    configuration.setMaxAge(3600L);
 	    
 	    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 	    source.registerCorsConfiguration("/**", configuration);
