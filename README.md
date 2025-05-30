@@ -61,11 +61,13 @@ git clone [URL_DO_REPOSITÓRIO]
 1. Compile o projeto:
 ```bash
 mvnw.cmd clean install
+mvn clean install
 ```
 
 2. Execute a aplicação:
 ```bash
 mvnw.cmd spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx256m -Xms128m"
 ```
 
 A aplicação estará disponível em `http://localhost:8080`
