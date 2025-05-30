@@ -1,6 +1,7 @@
 // src/main/java/com/example/loginauthapi/infra/security/SecurityConfig.java
 package com.example.loginauthapi.infra.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -11,13 +12,28 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
-import java.util.List;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
 	private final SecurityFilter securityFilter;
+
+	@Value("${app.cors.allowed-origins}")
+	private String allowedOrigins;
+
+	@Value("${app.cors.allowed-methods}")
+	private String allowedMethods;
+
+	@Value("${app.cors.allowed-headers}")
+	private String allowedHeaders;
+
+	@Value("${app.cors.allow-credentials}")
+	private boolean allowCredentials;
+
+	@Value("${app.cors.max-age}")
+	private long maxAge;
 
 	public SecurityConfig(SecurityFilter securityFilter) {
 		this.securityFilter = securityFilter;
@@ -32,11 +48,11 @@ public class SecurityConfig {
 	        // Configuração CORS
 	        .cors(cors -> cors.configurationSource(request -> {
 	            var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-	            corsConfig.setAllowedOrigins(List.of("https://localhost:5173"));
-	            corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-	            corsConfig.setAllowedHeaders(List.of("*"));
-	            corsConfig.setAllowCredentials(true);
-	            corsConfig.setMaxAge(3600L);
+	            corsConfig.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+	            corsConfig.setAllowedMethods(Arrays.asList(allowedMethods.split(",")));
+	            corsConfig.setAllowedHeaders(Arrays.asList(allowedHeaders.split(",")));
+	            corsConfig.setAllowCredentials(allowCredentials);
+	            corsConfig.setMaxAge(maxAge);
 	            return corsConfig;
 	        }))
 	        
@@ -69,26 +85,6 @@ public class SecurityConfig {
 	    
 	    return http.build();
 	}
-	
-//	@Bean
-//	SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource)
-//			throws Exception {
-//		return http
-//				.csrf(csrf -> csrf.disable())
-//				.cors(cors -> cors.configurationSource(corsConfigurationSource))
-//				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-//				.authorizeHttpRequests(authorize -> authorize.requestMatchers("/auth/**")
-//						.permitAll()
-//						.requestMatchers(
-//								"/swagger-ui.html",
-//								"/swagger-ui/**",
-//								"/v3/api-docs/**"
-//								)
-//						.permitAll()
-//						.anyRequest()
-//						.authenticated())
-//				.addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class).build();
-//	}
 
 	@Bean
 	PasswordEncoder passwordEncoder() {
