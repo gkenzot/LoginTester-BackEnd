@@ -40,7 +40,8 @@ public class SecurityConfig {
 			
 			// Autorizações
 			.authorizeHttpRequests(authorize -> authorize
-				.requestMatchers("/auth/**").permitAll()
+				.requestMatchers("/auth/**", "/auth/login").permitAll()
+				.requestMatchers("OPTIONS", "/**").permitAll() // Permite todas as requisições OPTIONS
 				.anyRequest().authenticated()
 			)
 			

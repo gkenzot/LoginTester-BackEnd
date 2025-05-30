@@ -8,6 +8,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class CorsConfig {
@@ -32,13 +33,19 @@ public class CorsConfig {
 	    CorsConfiguration configuration = new CorsConfiguration();
 	    
 	    // Configuração das origens permitidas
-	    configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+	    List<String> origins = Arrays.asList(allowedOrigins.split(","));
+	    configuration.setAllowedOrigins(origins);
 	    
 	    // Configuração dos métodos HTTP permitidos
-	    configuration.setAllowedMethods(Arrays.asList(allowedMethods.split(",")));
+	    List<String> methods = Arrays.asList(allowedMethods.split(","));
+	    configuration.setAllowedMethods(methods);
 	    
 	    // Configuração dos headers permitidos
-	    configuration.setAllowedHeaders(Arrays.asList(allowedHeaders.split(",")));
+	    List<String> headers = Arrays.asList(allowedHeaders.split(","));
+	    configuration.setAllowedHeaders(headers);
+	    
+	    // Headers expostos
+	    configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
 	    
 	    // Configuração de credenciais
 	    configuration.setAllowCredentials(allowCredentials);
