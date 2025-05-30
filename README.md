@@ -70,7 +70,7 @@ mvnw.cmd spring-boot:run
 mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx256m -Xms128m"
 ```
 
-A aplicação estará disponível em `http://localhost:8080`
+A aplicação estará disponível em `https://localhost:8443`
 
 ## 📚 Documentação da API
 
