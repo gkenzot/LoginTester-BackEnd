@@ -70,6 +70,7 @@ mvn clean install
 mvnw.cmd spring-boot:run
 .\mvnw spring-boot:run
 mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx256m -Xms128m"
+.\mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx256m -Xms128m"
 ```
 
 A aplicação estará disponível em `https://localhost:8443`
