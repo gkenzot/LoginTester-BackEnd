@@ -4,7 +4,7 @@ API de autenticação e autorização desenvolvida com Spring Boot 3.2.4.
 
 ## 🚀 Tecnologias Utilizadas
 
-- Java 17
+- Java 21
 - Spring Boot 3.2.4
 - Spring Security
 - Spring Data JPA
@@ -15,7 +15,7 @@ API de autenticação e autorização desenvolvida com Spring Boot 3.2.4.
 
 ## 📋 Pré-requisitos
 
-- Java 17 ou superior
+- Java 21 ou superior
 - Maven
 - MySQL
 - IDE de sua preferência (recomendado: IntelliJ IDEA ou Eclipse)
@@ -62,11 +62,13 @@ git clone [URL_DO_REPOSITÓRIO]
 ```bash
 mvnw.cmd clean install
 mvn clean install
+.\mvnw clean install
 ```
 
 2. Execute a aplicação:
 ```bash
 mvnw.cmd spring-boot:run
+.\mvnw spring-boot:run
 mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx256m -Xms128m"
 ```
 
