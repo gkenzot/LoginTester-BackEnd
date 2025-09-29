@@ -2,32 +2,28 @@
 FROM maven:3.9.8-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Debug: Mostra o diretório atual e seu conteúdo antes do build
-RUN pwd && ls -la
+# Copia primeiro só o pom.xml
+COPY pom.xml .
 
-# Copia todos os arquivos do projeto para o diretório /app
-COPY . .
+# Download de dependências em uma camada separada
+RUN mvn dependency:go-offline
 
-# Debug: Mostra o conteúdo após a cópia
-RUN echo "=== Conteúdo após COPY ===" && ls -la
+# Agora copia o código fonte
+COPY src src
 
-# Mostra a estrutura do projeto antes do build
-RUN echo "=== Estrutura do projeto antes do build ===" && \
-    ls -R
-
-# Realiza o build do projeto e gera o JAR com output detalhado
-RUN echo "=== Maven Version ===" && \
+# Faz o build com debug completo
+RUN echo "=== Versão do Maven ===" && \
     mvn --version && \
+    echo "=== Estrutura do Projeto ===" && \
+    find . -type f && \
     echo "=== Conteúdo do pom.xml ===" && \
     cat pom.xml && \
-    echo "=== Iniciando build com debug ===" && \
-    mvn clean package -DskipTests -X
-
-# Debug: Mostra detalhadamente o conteúdo após o build
-RUN echo "=== Conteúdo do diretório atual ===" && \
-    ls -la && \
-    echo "=== Conteúdo detalhado do target ===" && \
-    find . -name "*.jar" -type f -ls
+    echo "=== Iniciando build com debug completo ===" && \
+    mvn clean package -e -X -DskipTests && \
+    echo "=== Arquivos JAR gerados ===" && \
+    find . -name "*.jar" -type f -ls && \
+    echo "=== Conteúdo do diretório target ===" && \
+    ls -la target/
 
 # Etapa 2: Imagem final
 FROM eclipse-temurin:21-jre
@@ -53,6 +49,8 @@ EXPOSE 8080
 # Comando para rodar a aplicação com debug adicional
 CMD ["sh", "-c", "echo '=== Verificando ambiente de execução ===' && \
      java -version && \
+     echo '=== Variáveis de ambiente configuradas ===' && \
+     (env | grep -E 'DB_|JWT_|SPRING_|SSL_' | cut -d= -f1 || true) && \
      echo '=== Conteúdo do diretório de trabalho ===' && \
      pwd && ls -la && \
      echo '=== Executando JAR ===' && \
