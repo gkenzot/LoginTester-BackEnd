@@ -46,12 +46,18 @@ RUN echo "=== Verificando JAR copiado ===" && \
 
 EXPOSE 8080
 
-# Comando para rodar a aplicação com debug adicional
+# Comando para rodar a aplicação com debug adicional e configurações otimizadas
 CMD ["sh", "-c", "echo '=== Verificando ambiente de execução ===' && \
      java -version && \
      echo '=== Variáveis de ambiente configuradas ===' && \
      (env | grep -E 'DB_|JWT_|SPRING_|SSL_' | cut -d= -f1 || true) && \
      echo '=== Conteúdo do diretório de trabalho ===' && \
      pwd && ls -la && \
-     echo '=== Executando JAR ===' && \
-     java -jar app.jar"]
+     echo '=== Executando JAR com configurações otimizadas ===' && \
+     java -Xmx512m -Xms256m \
+     -XX:+UseG1GC \
+     -XX:+UseStringDeduplication \
+     -Dserver.tomcat.max-threads=20 \
+     -Dspring.jpa.open-in-view=false \
+     -Dspring.main.lazy-initialization=true \
+     -jar app.jar"]
