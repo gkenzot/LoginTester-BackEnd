@@ -46,7 +46,7 @@ RUN echo "=== Verificando JAR copiado ===" && \
 
 EXPOSE 8080
 
-# Comando para rodar a aplicação com debug adicional e configurações otimizadas
+# Comando para rodar a aplicação com configurações altamente otimizadas para baixo consumo de memória
 CMD ["sh", "-c", "echo '=== Verificando ambiente de execução ===' && \
      java -version && \
      echo '=== Variáveis de ambiente configuradas ===' && \
@@ -54,10 +54,29 @@ CMD ["sh", "-c", "echo '=== Verificando ambiente de execução ===' && \
      echo '=== Conteúdo do diretório de trabalho ===' && \
      pwd && ls -la && \
      echo '=== Executando JAR com configurações otimizadas ===' && \
-     java -Xmx512m -Xms256m \
+     java \
+     -Xmx400m \
+     -Xms200m \
+     -XX:MaxMetaspaceSize=120m \
+     -XX:CompressedClassSpaceSize=24m \
+     -Xss512k \
+     -XX:InitialCodeCacheSize=16m \
+     -XX:ReservedCodeCacheSize=48m \
+     -XX:MaxDirectMemorySize=10M \
      -XX:+UseG1GC \
      -XX:+UseStringDeduplication \
-     -Dserver.tomcat.max-threads=20 \
+     -XX:+UseCompressedOops \
+     -XX:G1HeapRegionSize=4m \
+     -XX:GCTimeRatio=4 \
+     -XX:AdaptiveSizePolicyWeight=90 \
+     -XX:MinHeapFreeRatio=20 \
+     -XX:MaxHeapFreeRatio=40 \
+     -XX:+ExitOnOutOfMemoryError \
+     -Djava.security.egd=file:/dev/./urandom \
+     -Dspring.config.location=classpath:/application.properties,classpath:/application-prod.properties \
+     -Dserver.tomcat.max-threads=10 \
+     -Dserver.tomcat.min-spare-threads=2 \
      -Dspring.jpa.open-in-view=false \
      -Dspring.main.lazy-initialization=true \
+     -Dspring.jmx.enabled=false \
      -jar app.jar"]
