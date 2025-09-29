@@ -13,20 +13,21 @@ RUN echo "=== Conteúdo após COPY ===" && ls -la
 
 # Mostra a estrutura do projeto antes do build
 RUN echo "=== Estrutura do projeto antes do build ===" && \
-    tree .
+    ls -R
 
 # Realiza o build do projeto e gera o JAR com output detalhado
-RUN mvn clean package -DskipTests -X
+RUN echo "=== Maven Version ===" && \
+    mvn --version && \
+    echo "=== Conteúdo do pom.xml ===" && \
+    cat pom.xml && \
+    echo "=== Iniciando build com debug ===" && \
+    mvn clean package -DskipTests -X
 
 # Debug: Mostra detalhadamente o conteúdo após o build
 RUN echo "=== Conteúdo do diretório atual ===" && \
     ls -la && \
     echo "=== Conteúdo detalhado do target ===" && \
-    ls -la target/ && \
-    echo "=== Maven version ===" && \
-    mvn --version && \
-    echo "=== Verificando pom.xml ===" && \
-    cat pom.xml
+    find . -name "*.jar" -type f -ls
 
 # Etapa 2: Imagem final
 FROM eclipse-temurin:21-jre
