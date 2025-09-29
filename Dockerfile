@@ -1,13 +1,13 @@
-FROM openjdk:21-jdk
 
-# Diretório de trabalho dentro do container
+# Etapa 1: Build do JAR
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
 
-# Copia o JAR gerado para dentro do container
-COPY target/login-auth-api-0.0.1-SNAPSHOT.jar app.jar
-
-# Expõe a porta padrão do Spring Boot
+# Etapa 2: Imagem final
+FROM openjdk:21-jdk
+WORKDIR /app
+COPY --from=build /app/target/login-auth-api-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
-
-# Comando para rodar a aplicação
 ENTRYPOINT ["java", "-jar", "app.jar"]
