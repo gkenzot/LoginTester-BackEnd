@@ -11,14 +11,22 @@ COPY . .
 # Debug: Mostra o conteúdo após a cópia
 RUN echo "=== Conteúdo após COPY ===" && ls -la
 
-# Realiza o build do projeto e gera o JAR
-RUN mvn clean package -DskipTests
+# Mostra a estrutura do projeto antes do build
+RUN echo "=== Estrutura do projeto antes do build ===" && \
+    tree .
 
-# Debug: Mostra detalhadamente o conteúdo do diretório target
-RUN echo "=== Conteúdo do target ===" && \
-    ls -la /app/target/ && \
-    echo "=== Conteúdo do target/classes ===" && \
-    ls -la /app/target/classes/ || true
+# Realiza o build do projeto e gera o JAR com output detalhado
+RUN mvn clean package -DskipTests -X
+
+# Debug: Mostra detalhadamente o conteúdo após o build
+RUN echo "=== Conteúdo do diretório atual ===" && \
+    ls -la && \
+    echo "=== Conteúdo detalhado do target ===" && \
+    ls -la target/ && \
+    echo "=== Maven version ===" && \
+    mvn --version && \
+    echo "=== Verificando pom.xml ===" && \
+    cat pom.xml
 
 # Etapa 2: Imagem final
 FROM eclipse-temurin:21-jre
@@ -42,4 +50,9 @@ RUN echo "=== Verificando JAR copiado ===" && \
 EXPOSE 8080
 
 # Comando para rodar a aplicação com debug adicional
-ENTRYPOINT ["sh", "-c", "echo '=== Tentando executar JAR ===' && pwd && ls -la && java -jar app.jar"]
+CMD ["sh", "-c", "echo '=== Verificando ambiente de execução ===' && \
+     java -version && \
+     echo '=== Conteúdo do diretório de trabalho ===' && \
+     pwd && ls -la && \
+     echo '=== Executando JAR ===' && \
+     java -jar app.jar"]
