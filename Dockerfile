@@ -73,7 +73,7 @@ CMD ["sh", "-c", "echo '=== Verificando ambiente de execução ===' && \
      -XX:MaxHeapFreeRatio=40 \
      -XX:+ExitOnOutOfMemoryError \
      -Djava.security.egd=file:/dev/./urandom \
-     -Dspring.config.location=classpath:/application.properties,classpath:/application-prod.properties \
+     -Dspring.config.location=classpath:/application.properties \
      -Dserver.tomcat.max-threads=10 \
      -Dserver.tomcat.min-spare-threads=2 \
      -Dspring.jpa.open-in-view=false \

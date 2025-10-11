@@ -1,4 +1,3 @@
-// src/main/java/com/example/loginauthapi/controller/UserController.java
 package com.example.loginauthapi.controller;
 
 import com.example.loginauthapi.dto.*;

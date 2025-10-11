@@ -12,11 +12,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.lang.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 @Component
 public class SecurityFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(SecurityFilter.class);
 
     @Autowired
     private TokenService tokenService;
@@ -30,16 +34,36 @@ public class SecurityFilter extends OncePerRequestFilter {
         @NonNull HttpServletResponse response,
         @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
+        
+        String requestPath = request.getRequestURI();
+        
+        logger.debug("Security filter processing: {} {}", request.getMethod(), requestPath);
+        
+        // Para endpoints de auth, não precisa validar token
+        if (requestPath.startsWith("/auth/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        
         var token = recoverToken(request);
         
         if (token != null) {
-            var email = tokenService.validateToken(token);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-            
-            var authentication = new UsernamePasswordAuthenticationToken(
-                userDetails, null, userDetails.getAuthorities());
-                
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            try {
+                var email = tokenService.validateToken(token);
+                if (email != null && !email.isEmpty()) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                    
+                    var authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                        
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    logger.debug("Authentication set for user: {}", email);
+                }
+            } catch (Exception e) {
+                // Token inválido - limpa o contexto de segurança
+                SecurityContextHolder.clearContext();
+                logger.warn("Invalid token detected: {}", e.getMessage());
+            }
         }
         filterChain.doFilter(request, response);
     }

@@ -10,25 +10,36 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfigurationSource;
+
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
 	private final SecurityFilter securityFilter;
-	private final CorsConfigurationSource corsConfigurationSource;
 
-	public SecurityConfig(SecurityFilter securityFilter, CorsConfigurationSource corsConfigurationSource) {
+	public SecurityConfig(SecurityFilter securityFilter) {
 		this.securityFilter = securityFilter;
-		this.corsConfigurationSource = corsConfigurationSource;
 	}
 
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		http
-			// Configuração CORS
-			.cors(cors -> cors.configurationSource(corsConfigurationSource))
+			// Configuração CORS que aceita qualquer origem (incluindo ngrok)
+			.cors(cors -> cors.configurationSource(request -> {
+				var config = new org.springframework.web.cors.CorsConfiguration();
+				
+				// Aceita qualquer origem usando padrão (funciona com ngrok e outros domínios)
+				config.addAllowedOriginPattern("*");
+				
+				config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+				config.setAllowedHeaders(Arrays.asList("*"));
+				config.setAllowCredentials(true);
+				config.setMaxAge(3600L);
+				
+				return config;
+			}))
 			
 			// Configuração CSRF (desabilitado para APIs stateless)
 			.csrf(csrf -> csrf.disable())
@@ -40,7 +51,7 @@ public class SecurityConfig {
 			
 			// Autorizações
 			.authorizeHttpRequests(authorize -> authorize
-				.requestMatchers("/auth/**", "/auth/login").permitAll()
+				.requestMatchers("/auth/**").permitAll()
 				.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
 				.requestMatchers("OPTIONS", "/**").permitAll() // Permite todas as requisições OPTIONS
 				.anyRequest().authenticated()

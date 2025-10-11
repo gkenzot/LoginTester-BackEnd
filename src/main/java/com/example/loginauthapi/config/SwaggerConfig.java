@@ -1,4 +1,3 @@
-// src/main/java/com/example/loginauthapi/config/SwaggerConfig.java
 package com.example.loginauthapi.config;
 
 import io.swagger.v3.oas.models.ExternalDocumentation;
