@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AuthService {
@@ -91,7 +93,7 @@ public class AuthService {
             
             ResponseCookie cookie = ResponseCookie.from("jwt", token != null ? token : "")
                 .httpOnly(true)
-                .secure(false) // Simplificado para desenvolvimento
+                .secure(isSecure)
                 .path("/")
                 .maxAge(Duration.ofHours(1))
                 .sameSite("Lax") // Simplificado para desenvolvimento
@@ -109,8 +111,20 @@ public class AuthService {
      * Registra um novo usuário
      */
     public void registerUser(RegisterRequestDTO registerRequest) {
+        logger.info("Registering new user: {}", registerRequest.email());
+        
+        // Validação de confirmação de senha
+        if (!registerRequest.password().equals(registerRequest.confirmPassword())) {
+            logger.warn("Password confirmation mismatch for user: {}", registerRequest.email());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha e confirmação de senha não coincidem");
+        }
+        
+        // Validação adicional de força da senha
+        validatePasswordStrength(registerRequest.password());
+        
         // Verifica se o email já está cadastrado
         if (userRepository.findByEmail(registerRequest.email()).isPresent()) {
+            logger.warn("Email already exists: {}", registerRequest.email());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email já cadastrado");
         }
         
@@ -119,9 +133,66 @@ public class AuthService {
         user.setName(registerRequest.name());
         user.setEmail(registerRequest.email());
         user.setPassword(passwordEncoder.encode(registerRequest.password()));
-        user.setRole(com.example.loginauthapi.domain.UserRole.USER);
+        user.setRole(com.example.loginauthapi.domain.UserRole.UNVERIFIED);
         
         userRepository.save(user);
+        logger.info("User registered successfully: {}", registerRequest.email());
+    }
+    
+    /**
+     * Valida a força da senha com critérios específicos
+     */
+    private void validatePasswordStrength(String password) {
+        List<String> errors = new ArrayList<>();
+        
+        if (password == null || password.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha é obrigatória");
+        }
+        
+        if (password.length() < 8) {
+            errors.add("Senha deve ter pelo menos 8 caracteres");
+        }
+        
+        if (password.length() > 128) {
+            errors.add("Senha deve ter no máximo 128 caracteres");
+        }
+        
+        if (!password.matches(".*[a-z].*")) {
+            errors.add("Senha deve conter pelo menos uma letra minúscula");
+        }
+        
+        if (!password.matches(".*[A-Z].*")) {
+            errors.add("Senha deve conter pelo menos uma letra maiúscula");
+        }
+        
+        if (!password.matches(".*\\d.*")) {
+            errors.add("Senha deve conter pelo menos um número");
+        }
+        
+        if (!password.matches(".*[@$!%*?&].*")) {
+            errors.add("Senha deve conter pelo menos um símbolo especial (@$!%*?&)");
+        }
+        
+        // Verifica se contém espaços
+        if (password.contains(" ")) {
+            errors.add("Senha não pode conter espaços");
+        }
+        
+        // Verifica senhas comuns fracas
+        String[] commonPasswords = {"123456", "password", "123456789", "12345678", "12345", 
+                                   "1234567", "1234567890", "qwerty", "abc123", "password123"};
+        for (String common : commonPasswords) {
+            if (password.toLowerCase().contains(common.toLowerCase())) {
+                errors.add("Senha muito comum. Escolha uma senha mais segura");
+                break;
+            }
+        }
+        
+        if (!errors.isEmpty()) {
+            String errorMessage = "Senha não atende aos critérios de segurança: " + String.join(", ", errors);
+            logger.warn("Password validation failed: {}", errorMessage);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
+        }
     }
 
     /**
