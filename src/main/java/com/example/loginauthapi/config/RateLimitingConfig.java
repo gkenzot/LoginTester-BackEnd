@@ -41,8 +41,21 @@ public class RateLimitingConfig {
     @Bean
     @ConditionalOnProperty(prefix = "ratelimit", name = "enabled", havingValue = "true", matchIfMissing = false)
     public LettuceBasedProxyManager proxyManager() {
-        // TODO: inicializar conexão real com Redis quando ratelimit estiver habilitado
-        return null; // será substituído quando ratelimit estiver ativo
+        try {
+            RedisURI redisUri = RedisURI.builder()
+                    .withHost(redisHost)
+                    .withPort(redisPort)
+                    .withPassword(redisPassword.isEmpty() ? null : redisPassword.toCharArray())
+                    .build();
+            
+            RedisClient redisClient = RedisClient.create(redisUri);
+            return LettuceBasedProxyManager.builderFor(redisClient)
+                    .withExpirationStrategy(ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10)))
+                    .build();
+        } catch (Exception e) {
+            // Em caso de erro, retorna null para permitir fallback
+            return null;
+        }
     }
 
     @Component
@@ -53,7 +66,7 @@ public class RateLimitingConfig {
         private final LettuceBasedProxyManager proxyManager;
 
         public RateLimitBuckets(LettuceBasedProxyManager proxyManager) {
-            this.proxyManager = proxyManager; // Pode ser null quando rate limiting está desabilitado
+            this.proxyManager = proxyManager;
         }
 
         /**
@@ -61,9 +74,10 @@ public class RateLimitingConfig {
          * Limite: 5 tentativas por minuto por IP
          */
         public Bucket getLoginBucket(String key) {
-            return Bucket.builder()
-                    .addLimit(Bandwidth.classic(1000, Refill.intervally(1000, Duration.ofMinutes(1))))
+            BucketConfiguration config = BucketConfiguration.builder()
+                    .addLimit(Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1))))
                     .build();
+            return proxyManager.builder().build(key.getBytes(), config);
         }
 
         /**
@@ -71,9 +85,10 @@ public class RateLimitingConfig {
          * Limite: 10 tentativas por hora por IP (ajustado para testes)
          */
         public Bucket getRegisterBucket(String key) {
-            return Bucket.builder()
-                    .addLimit(Bandwidth.classic(1000, Refill.intervally(1000, Duration.ofHours(1))))
+            BucketConfiguration config = BucketConfiguration.builder()
+                    .addLimit(Bandwidth.classic(10, Refill.intervally(10, Duration.ofHours(1))))
                     .build();
+            return proxyManager.builder().build(key.getBytes(), config);
         }
 
         /**
@@ -81,9 +96,10 @@ public class RateLimitingConfig {
          * Limite: 60 tentativas por minuto por IP
          */
         public Bucket getCheckBucket(String key) {
-            return Bucket.builder()
-                    .addLimit(Bandwidth.classic(1000, Refill.intervally(1000, Duration.ofMinutes(1))))
+            BucketConfiguration config = BucketConfiguration.builder()
+                    .addLimit(Bandwidth.classic(60, Refill.intervally(60, Duration.ofMinutes(1))))
                     .build();
+            return proxyManager.builder().build(key.getBytes(), config);
         }
     }
 
@@ -101,7 +117,9 @@ public class RateLimitingConfig {
         @Override public Bucket getCheckBucket(String key) { return unlimitedBucket(); }
 
         private Bucket unlimitedBucket() {
-            return Bucket.builder().addLimit(Bandwidth.classic(1000, Refill.intervally(1000, Duration.ofMinutes(1)))).build();
+            return Bucket.builder()
+                    .addLimit(Bandwidth.classic(Integer.MAX_VALUE, Refill.intervally(Integer.MAX_VALUE, Duration.ofMinutes(1))))
+                    .build();
         }
     }
 }

@@ -19,7 +19,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.context.annotation.Import;
 import com.example.loginauthapi.config.TestSecurityConfig;
-import org.springframework.http.ResponseCookie;
 
 import java.util.Map;
 

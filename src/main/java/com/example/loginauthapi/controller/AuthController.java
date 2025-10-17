@@ -4,8 +4,6 @@ import com.example.loginauthapi.dto.LoginRequestDTO;
 import com.example.loginauthapi.dto.RegisterRequestDTO;
 import com.example.loginauthapi.service.AuthService;
 import com.example.loginauthapi.service.TokenBlacklistService;
-import com.example.loginauthapi.service.EmailVerificationService;
-import com.example.loginauthapi.service.EmailVerificationCodeService;
 import com.example.loginauthapi.infra.security.TokenService;
 import com.example.loginauthapi.config.RateLimit;
 import com.example.loginauthapi.annotation.Auditable;
@@ -43,8 +41,6 @@ public class AuthController {
 
     private final AuthService authService;
     private final TokenBlacklistService tokenBlacklistService;
-    private final EmailVerificationService emailVerificationService;
-    private final EmailVerificationCodeService emailVerificationCodeService;
     private final TokenService tokenService;
 
 	@ApiResponses(value = { 

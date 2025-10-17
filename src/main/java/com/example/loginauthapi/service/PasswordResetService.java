@@ -23,7 +23,6 @@ public class PasswordResetService {
     
     private final UserRepository userRepository;
     private final PasswordResetTokenRepository tokenRepository;
-    private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     
     public void requestPasswordReset(ForgotPasswordRequest request) {
