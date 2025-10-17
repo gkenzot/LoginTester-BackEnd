@@ -5,8 +5,8 @@ WORKDIR /app
 # Copia primeiro só o pom.xml
 COPY pom.xml .
 
-# Download de dependências em uma camada separada
-RUN mvn dependency:go-offline
+# Download de dependências em uma camada separada (resiliente)
+RUN mvn -q -U -DskipTests -DincludeScope=test dependency:go-offline || true
 
 # Agora copia o código fonte
 COPY src src

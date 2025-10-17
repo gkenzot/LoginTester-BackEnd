@@ -1,0 +1,19 @@
+package com.example.loginauthapi.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SendEmailVerificationCodeRequest {
+
+    @NotBlank(message = "Email é obrigatório")
+    @Email(message = "Email deve ter um formato válido")
+    private String email;
+}
