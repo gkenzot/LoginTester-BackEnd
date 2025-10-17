@@ -1,6 +1,6 @@
 package com.example.loginauthapi.unit.controller;
 
-import com.example.loginauthapi.config.UserTestSecurityConfig;
+import com.example.loginauthapi.config.TestSecurityConfig;
 import com.example.loginauthapi.controller.UserController;
 import com.example.loginauthapi.dto.UpdatePasswordDTO;
 import com.example.loginauthapi.dto.UpdateUserDTO;
@@ -22,12 +22,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.*;
@@ -35,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = UserController.class)
-@Import(UserTestSecurityConfig.class)
+@Import(TestSecurityConfig.class)
 class UserControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -93,7 +87,7 @@ class UserControllerTest {
         when(userService.getCurrentUser("test@mail.com")).thenReturn(userResponse);
 
         // When & Then
-        mockMvc.perform(get("/user/me"))
+        mockMvc.perform(get("/api/user/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("user-123"))
                 .andExpect(jsonPath("$.name").value("Test User"))
@@ -109,7 +103,7 @@ class UserControllerTest {
                 org.springframework.http.HttpStatus.NOT_FOUND, "User not found"));
 
         // When & Then
-        mockMvc.perform(get("/user/me"))
+        mockMvc.perform(get("/api/user/me"))
                 .andExpect(status().isNotFound());
     }
 
@@ -119,7 +113,7 @@ class UserControllerTest {
         SecurityContextHolder.clearContext();
 
         // When & Then
-        mockMvc.perform(get("/user/me"))
+        mockMvc.perform(get("/api/user/me"))
                 .andExpect(status().isOk()); // Changed expectation since UserTestSecurityConfig permits all requests
     }
 
@@ -137,7 +131,7 @@ class UserControllerTest {
         when(userService.updateUserInfo("test@mail.com", updateUserDTO)).thenReturn(updatedResponse);
 
         // When & Then
-        mockMvc.perform(patch("/user/me")
+        mockMvc.perform(patch("/api/user/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateUserDTO)))
                 .andExpect(status().isOk())
@@ -153,7 +147,7 @@ class UserControllerTest {
                 org.springframework.http.HttpStatus.BAD_REQUEST, "Name cannot be empty"));
 
         // When & Then
-        mockMvc.perform(patch("/user/me")
+        mockMvc.perform(patch("/api/user/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(emptyNameDTO)))
                 .andExpect(status().isBadRequest());
@@ -168,7 +162,7 @@ class UserControllerTest {
                 org.springframework.http.HttpStatus.BAD_REQUEST, "Name cannot be empty"));
 
         // When & Then
-        mockMvc.perform(patch("/user/me")
+        mockMvc.perform(patch("/api/user/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(nullNameDTO)))
                 .andExpect(status().isBadRequest());
@@ -177,7 +171,7 @@ class UserControllerTest {
     @Test
     void updateUserInfo_WithInvalidJson_ShouldReturnBadRequest() throws Exception {
         // When & Then
-        mockMvc.perform(patch("/user/me")
+        mockMvc.perform(patch("/api/user/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("invalid json"))
                 .andExpect(status().isBadRequest());
@@ -191,7 +185,7 @@ class UserControllerTest {
         doNothing().when(userService).updatePassword("test@mail.com", updatePasswordDTO);
 
         // When & Then
-        mockMvc.perform(patch("/user/me/password")
+        mockMvc.perform(patch("/api/user/me/password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePasswordDTO)))
                 .andExpect(status().isNoContent());
@@ -205,7 +199,7 @@ class UserControllerTest {
             .when(userService).updatePassword("test@mail.com", updatePasswordDTO);
 
         // When & Then
-        mockMvc.perform(patch("/user/me/password")
+        mockMvc.perform(patch("/api/user/me/password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePasswordDTO)))
                 .andExpect(status().isUnauthorized());
@@ -224,7 +218,7 @@ class UserControllerTest {
             .when(userService).updatePassword("test@mail.com", mismatchPasswordDTO);
 
         // When & Then
-        mockMvc.perform(patch("/user/me/password")
+        mockMvc.perform(patch("/api/user/me/password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mismatchPasswordDTO)))
                 .andExpect(status().isBadRequest());

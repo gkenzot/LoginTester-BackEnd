@@ -70,7 +70,7 @@ class UserServiceTest {
 
         // Then
         assertThat(result).isNotNull();
-        assertThat(result.id()).isEqualTo("user-123");
+        assertThat(result.id()).isEqualTo(testUser.getId().toString());
         assertThat(result.name()).isEqualTo("Test User");
         assertThat(result.email()).isEqualTo("test@mail.com");
         assertThat(result.role()).isEqualTo("USER");

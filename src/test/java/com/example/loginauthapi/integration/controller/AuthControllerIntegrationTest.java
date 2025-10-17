@@ -1,16 +1,19 @@
 package com.example.loginauthapi.integration.controller;
 
-import com.example.loginauthapi.dto.LoginRequestDTO;
-import com.example.loginauthapi.dto.RegisterRequestDTO;
+import com.example.loginauthapi.domain.User;
+import com.example.loginauthapi.domain.UserRole;
 import com.example.loginauthapi.service.AuthService;
 import com.example.loginauthapi.service.TokenBlacklistService;
 import com.example.loginauthapi.infra.security.TokenService;
 import com.example.loginauthapi.infra.security.CustomUserDetailsService;
-import com.example.loginauthapi.repositories.UserRepository;
+import com.example.loginauthapi.dto.LoginRequestDTO;
+import com.example.loginauthapi.dto.RegisterRequestDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -19,8 +22,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.context.annotation.Import;
 import com.example.loginauthapi.config.TestSecurityConfig;
-
-import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -51,8 +52,6 @@ class AuthControllerIntegrationTest {
     @MockBean
     private CustomUserDetailsService customUserDetailsService;
 
-    @MockBean
-    private UserRepository userRepository;
 
     private ObjectMapper objectMapper;
 
@@ -116,7 +115,7 @@ class AuthControllerIntegrationTest {
             // Mock já configurado no setUp() - não precisa reconfigurar
 
             // When & Then
-            mockMvc.perform(post("/auth/login")
+            mockMvc.perform(post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(loginRequest)))
                     .andDo(print())
@@ -140,7 +139,7 @@ class AuthControllerIntegrationTest {
                         org.springframework.http.HttpStatus.UNAUTHORIZED, "Credenciais inválidas"));
 
         // When & Then
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginRequest)))
                 .andDo(print())
@@ -156,10 +155,32 @@ class AuthControllerIntegrationTest {
             "Test User", "test@example.com", "Password123!", "Password123!"
         );
 
-        doNothing().when(authService).registerUser(any(RegisterRequestDTO.class));
+        User mockUser = new User();
+        mockUser.setId(UUID.randomUUID());
+        mockUser.setName("Test User");
+        mockUser.setEmail("test@example.com");
+        mockUser.setRole(UserRole.UNVERIFIED);
+        
+        when(authService.registerUser(any(RegisterRequestDTO.class))).thenReturn(mockUser);
+        
+        // Mock do TokenService para gerar tokens
+        Map<String, String> mockTokenPair = new HashMap<>();
+        mockTokenPair.put("accessToken", "mock-access-token");
+        mockTokenPair.put("refreshToken", "mock-refresh-token");
+        when(tokenService.generateTokenPair(any(User.class))).thenReturn(mockTokenPair);
+        
+        // Mock do createAuthCookie para evitar NullPointerException
+        org.springframework.http.ResponseCookie mockCookie = org.springframework.http.ResponseCookie.from("jwt", "mock-token")
+            .httpOnly(true)
+            .secure(false)
+            .path("/")
+            .maxAge(java.time.Duration.ofMinutes(15))
+            .build();
+        when(authService.createAuthCookie(anyString(), any(jakarta.servlet.http.HttpServletRequest.class)))
+            .thenReturn(mockCookie);
 
         // When & Then
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerRequest)))
                 .andDo(print())
@@ -181,7 +202,7 @@ class AuthControllerIntegrationTest {
                 .when(authService).registerUser(any(RegisterRequestDTO.class));
 
         // When & Then
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerRequest)))
                 .andDo(print())
@@ -201,7 +222,7 @@ class AuthControllerIntegrationTest {
         // O mock de logoutWithBlacklist já está configurado no setUp()
 
         // When & Then
-        mockMvc.perform(post("/auth/logout")
+        mockMvc.perform(post("/api/auth/logout")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", accessToken))
                 .contentType(MediaType.APPLICATION_JSON))
                 .andDo(print())
@@ -221,7 +242,7 @@ class AuthControllerIntegrationTest {
         // O mock de logoutWithBlacklist já está configurado no setUp()
 
         // When & Then
-        mockMvc.perform(post("/auth/logout")
+        mockMvc.perform(post("/api/auth/logout")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(requestBody)))
                 .andDo(print())
@@ -246,7 +267,7 @@ class AuthControllerIntegrationTest {
         // Mock já configurado no setUp() - não precisa reconfigurar
 
         // When & Then
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(requestBody)))
                 .andDo(print())
@@ -271,7 +292,7 @@ class AuthControllerIntegrationTest {
                         org.springframework.http.HttpStatus.UNAUTHORIZED, "Refresh token inválido"));
 
         // When & Then
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(requestBody)))
                 .andDo(print())
@@ -293,7 +314,7 @@ class AuthControllerIntegrationTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(get("/auth/check")
+        mockMvc.perform(get("/api/auth/check")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", accessToken)))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -316,7 +337,7 @@ class AuthControllerIntegrationTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(get("/auth/check")
+        mockMvc.perform(get("/api/auth/check")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", accessToken)))
                 .andDo(print())
                 .andExpect(status().isUnauthorized())
@@ -337,7 +358,7 @@ class AuthControllerIntegrationTest {
         when(authService.validateTokenAndGetUser(isNull())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(get("/auth/check"))
+        mockMvc.perform(get("/api/auth/check"))
                 .andDo(print())
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.authenticated").value(false))
@@ -365,7 +386,7 @@ class AuthControllerIntegrationTest {
         when(tokenBlacklistService.getBlacklistStats()).thenReturn(stats);
 
         // When & Then
-        mockMvc.perform(get("/auth/blacklist/stats")
+        mockMvc.perform(get("/api/auth/blacklist/stats")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", adminToken)))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -391,7 +412,7 @@ class AuthControllerIntegrationTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(get("/auth/blacklist/stats")
+        mockMvc.perform(get("/api/auth/blacklist/stats")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", userToken)))
                 .andDo(print())
                 .andExpect(status().isForbidden())

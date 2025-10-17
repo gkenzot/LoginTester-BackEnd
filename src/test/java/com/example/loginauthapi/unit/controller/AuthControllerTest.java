@@ -2,13 +2,15 @@ package com.example.loginauthapi.unit.controller;
 
 import com.example.loginauthapi.config.TestSecurityConfig;
 import com.example.loginauthapi.controller.AuthController;
-import com.example.loginauthapi.dto.LoginRequestDTO;
-import com.example.loginauthapi.dto.RegisterRequestDTO;
+import com.example.loginauthapi.domain.User;
+import com.example.loginauthapi.domain.UserRole;
+import java.util.UUID;
 import com.example.loginauthapi.service.AuthService;
 import com.example.loginauthapi.service.TokenBlacklistService;
 import com.example.loginauthapi.infra.security.TokenService;
 import com.example.loginauthapi.infra.security.CustomUserDetailsService;
-import com.example.loginauthapi.repositories.UserRepository;
+import com.example.loginauthapi.dto.LoginRequestDTO;
+import com.example.loginauthapi.dto.RegisterRequestDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +24,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.http.ResponseCookie;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -50,8 +54,6 @@ class AuthControllerTest {
     @MockBean
     private CustomUserDetailsService userDetailsService;
 
-    @MockBean
-    private UserRepository userRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -93,7 +95,7 @@ class AuthControllerTest {
         when(authService.authenticateUser(any(LoginRequestDTO.class))).thenReturn(authData);
 
         // When & Then
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
@@ -110,7 +112,7 @@ class AuthControllerTest {
                 org.springframework.http.HttpStatus.UNAUTHORIZED, "Credenciais inválidas"));
 
         // When & Then
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isUnauthorized());
@@ -119,7 +121,7 @@ class AuthControllerTest {
     @Test
     void login_WithInvalidJson_ShouldReturnBadRequest() throws Exception {
         // When & Then
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("invalid json"))
                 .andExpect(status().isBadRequest());
@@ -134,7 +136,7 @@ class AuthControllerTest {
                 org.springframework.http.HttpStatus.BAD_REQUEST, "Email é obrigatório"));
 
         // When & Then
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
@@ -149,7 +151,7 @@ class AuthControllerTest {
                 org.springframework.http.HttpStatus.BAD_REQUEST, "Senha é obrigatória"));
 
         // When & Then
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
@@ -160,10 +162,32 @@ class AuthControllerTest {
     @Test
     void register_WithValidData_ShouldReturnSuccess() throws Exception {
         // Given
-        doNothing().when(authService).registerUser(any(RegisterRequestDTO.class));
+        User mockUser = new User();
+        mockUser.setId(UUID.randomUUID());
+        mockUser.setName("Test User");
+        mockUser.setEmail("test@mail.com");
+        mockUser.setRole(UserRole.UNVERIFIED);
+        
+        when(authService.registerUser(any(RegisterRequestDTO.class))).thenReturn(mockUser);
+        
+        // Mock do TokenService para gerar tokens
+        Map<String, String> mockTokenPair = new HashMap<>();
+        mockTokenPair.put("accessToken", "mock-access-token");
+        mockTokenPair.put("refreshToken", "mock-refresh-token");
+        when(tokenService.generateTokenPair(any(User.class))).thenReturn(mockTokenPair);
+        
+        // Mock do createAuthCookie para evitar NullPointerException
+        ResponseCookie mockCookie = ResponseCookie.from("jwt", "mock-token")
+            .httpOnly(true)
+            .secure(false)
+            .path("/")
+            .maxAge(Duration.ofMinutes(15))
+            .build();
+        when(authService.createAuthCookie(anyString(), any(HttpServletRequest.class)))
+            .thenReturn(mockCookie);
 
         // When & Then
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isOk());
@@ -177,7 +201,7 @@ class AuthControllerTest {
             .when(authService).registerUser(any(RegisterRequestDTO.class));
 
         // When & Then
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isBadRequest());
@@ -197,7 +221,7 @@ class AuthControllerTest {
             .when(authService).registerUser(any(RegisterRequestDTO.class));
 
         // When & Then
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
@@ -217,7 +241,7 @@ class AuthControllerTest {
             .when(authService).registerUser(any(RegisterRequestDTO.class));
 
         // When & Then
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(weakPasswordRequest)))
                 .andExpect(status().isBadRequest());
@@ -226,7 +250,7 @@ class AuthControllerTest {
     @Test
     void register_WithInvalidJson_ShouldReturnBadRequest() throws Exception {
         // When & Then
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("invalid json"))
                 .andExpect(status().isBadRequest());
@@ -245,7 +269,7 @@ class AuthControllerTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(post("/auth/logout")
+        mockMvc.perform(post("/api/auth/logout")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", "valid-token"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\": \"refresh-token\"}"))
@@ -263,7 +287,7 @@ class AuthControllerTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(post("/auth/logout")
+        mockMvc.perform(post("/api/auth/logout")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", "invalid-token"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\": \"refresh-token\"}"))
@@ -278,7 +302,7 @@ class AuthControllerTest {
             .thenReturn(org.springframework.http.ResponseCookie.from("jwt", "").build());
 
         // When & Then
-        mockMvc.perform(post("/auth/logout")
+        mockMvc.perform(post("/api/auth/logout")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\": \"refresh-token\"}"))
                 .andExpect(status().isOk())
@@ -298,7 +322,7 @@ class AuthControllerTest {
         when(authService.refreshAccessToken(anyString())).thenReturn(authData);
 
         // When & Then
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\": \"valid-refresh-token\"}"))
                 .andExpect(status().isOk())
@@ -314,7 +338,7 @@ class AuthControllerTest {
                 org.springframework.http.HttpStatus.UNAUTHORIZED, "Refresh token inválido"));
 
         // When & Then
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\": \"invalid-refresh-token\"}"))
                 .andExpect(status().isUnauthorized());
@@ -328,7 +352,7 @@ class AuthControllerTest {
                 org.springframework.http.HttpStatus.BAD_REQUEST, "Refresh token é obrigatório"));
 
         // When & Then
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isBadRequest());
@@ -347,7 +371,7 @@ class AuthControllerTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(get("/auth/check")
+        mockMvc.perform(get("/api/auth/check")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", "valid-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(true))
@@ -364,7 +388,7 @@ class AuthControllerTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(get("/auth/check")
+        mockMvc.perform(get("/api/auth/check")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", "invalid-token")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.authenticated").value(false))
@@ -390,7 +414,7 @@ class AuthControllerTest {
         when(tokenBlacklistService.getBlacklistStats()).thenReturn(stats);
 
         // When & Then
-        mockMvc.perform(get("/auth/blacklist/stats")
+        mockMvc.perform(get("/api/auth/blacklist/stats")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", "admin-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokensBlacklisted").value(10))
@@ -409,7 +433,7 @@ class AuthControllerTest {
         when(authService.validateTokenAndGetUser(anyString())).thenReturn(authResult);
 
         // When & Then
-        mockMvc.perform(get("/auth/blacklist/stats")
+        mockMvc.perform(get("/api/auth/blacklist/stats")
                 .cookie(new jakarta.servlet.http.Cookie("jwt", "user-token")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("Acesso negado"))
