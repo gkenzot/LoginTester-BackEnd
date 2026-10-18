@@ -38,7 +38,7 @@ public class SecurityFilter extends OncePerRequestFilter {
         logger.debug("Security filter processing: {} {}", request.getMethod(), requestPath);
         
         // Para endpoints de auth, não precisa validar token
-        if (requestPath.startsWith("/auth/")) {
+        if (requestPath.startsWith("/api/auth/")) {
             filterChain.doFilter(request, response);
             return;
         }

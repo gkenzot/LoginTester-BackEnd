@@ -1,5 +1,6 @@
 package com.example.loginauthapi.controller;
 
+import com.example.loginauthapi.domain.AccessFlag;
 import com.example.loginauthapi.dto.UpdateUserDTO;
 import com.example.loginauthapi.dto.UserResponseDTO;
 import com.example.loginauthapi.service.UserService;
@@ -17,7 +18,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -43,8 +43,8 @@ public class AdminController {
         
         log.info("Admin request to list all users");
         
-        // Verificar autenticação e role de admin
-        validateAdminAccess(token, request);
+        // Acesso: ADMIN ou USER com flag 001 (administrar usuários e flags)
+        authService.validateAccessByFlag(token, AccessFlag.MANAGE_USERS_AND_FLAGS);
         
         List<UserResponseDTO> users = userService.getAllUsers();
         log.info("Retrieved {} users for admin", users.size());
@@ -67,8 +67,7 @@ public class AdminController {
         
         log.info("Admin request to get user by ID: {}", userId);
         
-        // Verificar autenticação e role de admin
-        validateAdminAccess(token, request);
+        authService.validateAccessByFlag(token, AccessFlag.MANAGE_USERS_AND_FLAGS);
         
         UserResponseDTO user = userService.getUserById(userId);
         log.info("Retrieved user: {}", user.email());
@@ -93,8 +92,7 @@ public class AdminController {
         
         log.info("Admin request to update user: {}", userId);
         
-        // Verificar autenticação e role de admin
-        validateAdminAccess(token, request);
+        authService.validateAccessByFlag(token, AccessFlag.MANAGE_USERS_AND_FLAGS);
         
         UserResponseDTO updatedUser = userService.updateUserById(userId, dto);
         log.info("Updated user: {}", updatedUser.email());
@@ -117,8 +115,7 @@ public class AdminController {
         
         log.info("Admin request to delete user: {}", userId);
         
-        // Verificar autenticação e role de admin
-        validateAdminAccess(token, request);
+        authService.validateAccessByFlag(token, AccessFlag.MANAGE_USERS_AND_FLAGS);
         
         userService.deleteUserById(userId);
         log.info("Deleted user: {}", userId);
@@ -126,23 +123,4 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    private void validateAdminAccess(String token, HttpServletRequest request) {
-        // Verificar autenticação
-        Map<String, Object> authResult = authService.validateTokenAndGetUser(token);
-        boolean authenticated = (Boolean) authResult.get("authenticated");
-        
-        if (!authenticated) {
-            log.warn("Admin access denied: {}", authResult.get("message"));
-            throw new RuntimeException("Token de autenticação inválido ou expirado");
-        }
-        
-        // Verificar se é ADMIN
-        String role = (String) authResult.get("role");
-        if (!"ADMIN".equals(role)) {
-            log.warn("Admin access denied for role: {}", role);
-            throw new RuntimeException("Acesso negado - apenas administradores podem acessar esta funcionalidade");
-        }
-        
-        log.debug("Admin access validated for user: {}", authResult.get("user"));
-    }
 }

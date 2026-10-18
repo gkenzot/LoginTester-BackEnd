@@ -9,9 +9,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Entity
 @Table(name = "users")
@@ -40,6 +38,17 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserRole role;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "user_access_flags", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "flag_code")
+    private Set<String> accessFlags = new HashSet<>();
+
+    @Column(name = "profile_photo_path")
+    private String profilePhotoPath;
+
+    @Column(name = "preferred_language")
+    private String preferredLanguage;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -84,7 +84,7 @@ public class AuditService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("email", email);
         metadata.put("success", success);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(email, eventType, 
             success ? "Login realizado com sucesso" : "Tentativa de login falhada",
@@ -97,7 +97,7 @@ public class AuditService {
     public void logLogout(String userId, String ipAddress, String userAgent) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("userId", userId);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(userId, "LOGOUT", "Usuário fez logout",
             ipAddress, userAgent, AuditEvent.AuditResult.SUCCESS, metadata);
@@ -109,7 +109,7 @@ public class AuditService {
     public void logPasswordChange(String userId, String ipAddress, String userAgent) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("userId", userId);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(userId, "PASSWORD_CHANGE", "Senha alterada",
             ipAddress, userAgent, AuditEvent.AuditResult.SUCCESS, metadata);
@@ -123,7 +123,7 @@ public class AuditService {
         metadata.put("userId", userId);
         metadata.put("activity", activity);
         metadata.put("details", details);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(userId, "SUSPICIOUS_ACTIVITY", "Atividade suspeita detectada: " + activity,
             ipAddress, userAgent, AuditEvent.AuditResult.SUSPICIOUS, metadata);
@@ -137,7 +137,7 @@ public class AuditService {
         metadata.put("userId", userId);
         metadata.put("token", token.substring(0, Math.min(20, token.length())) + "...");
         metadata.put("reason", reason);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(userId, "TOKEN_BLACKLIST", "Token adicionado à blacklist: " + reason,
             ipAddress, null, AuditEvent.AuditResult.SUCCESS, metadata);
@@ -151,7 +151,7 @@ public class AuditService {
         metadata.put("userId", userId);
         metadata.put("resource", resource);
         metadata.put("reason", reason);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(userId, "ACCESS_DENIED", "Acesso negado: " + reason,
             ipAddress, userAgent, AuditEvent.AuditResult.BLOCKED, metadata);
@@ -167,7 +167,7 @@ public class AuditService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("userId", userId);
         metadata.put("success", success);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(userId, eventType, 
             success ? "Token renovado com sucesso" : "Falha na renovação do token",
@@ -184,7 +184,7 @@ public class AuditService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("email", email);
         metadata.put("success", success);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
         
         logEventAsync(email, eventType, 
             success ? "Usuário registrado com sucesso" : "Falha no registro de usuário",

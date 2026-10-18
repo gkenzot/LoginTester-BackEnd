@@ -1,9 +1,11 @@
 package com.example.loginauthapi.controller;
 
 import com.example.loginauthapi.dto.LoginRequestDTO;
+import com.example.loginauthapi.dto.RefreshTokenRequestDTO;
 import com.example.loginauthapi.dto.RegisterRequestDTO;
 import com.example.loginauthapi.service.AuthService;
 import com.example.loginauthapi.service.TokenBlacklistService;
+import com.example.loginauthapi.service.UserService;
 import com.example.loginauthapi.infra.security.TokenService;
 import com.example.loginauthapi.config.RateLimit;
 import com.example.loginauthapi.annotation.Auditable;
@@ -40,6 +42,7 @@ public class AuthController {
 	private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
+    private final UserService userService;
     private final TokenBlacklistService tokenBlacklistService;
     private final TokenService tokenService;
 
@@ -50,7 +53,7 @@ public class AuthController {
 		    @ApiResponse(responseCode = "429", description = "Rate limit excedido")
 		})
 	@PostMapping("/login")
-	// @RateLimit(RateLimit.EndpointType.LOGIN)
+	@RateLimit(RateLimit.EndpointType.LOGIN)
 	@Auditable(eventType = "LOGIN_ATTEMPT", description = "Tentativa de login do usuário")
 	public ResponseEntity<Map<String, Object>> login(
 		@RequestBody @Valid LoginRequestDTO body,
@@ -105,14 +108,9 @@ public class AuthController {
 	        var responseCookie = authService.createAuthCookie(accessToken, request);
 	        response.addHeader(HttpHeaders.SET_COOKIE, responseCookie.toString());
 	        
-	        // Preparar resposta com dados do usuário
+	        // Preparar resposta com dados do usuário (mesmo DTO usado em login/refresh)
 	        Map<String, Object> authData = new HashMap<>();
-	        Map<String, Object> userInfo = new HashMap<>();
-	        userInfo.put("id", user.getId());
-	        userInfo.put("email", user.getEmail());
-	        userInfo.put("name", user.getName());
-	        userInfo.put("role", user.getRole().name());
-	        authData.put("user", userInfo);
+	        authData.put("user", userService.toUserResponseDTO(user));
 	        authData.put("message", "Usuário registrado com sucesso. Clique em 'VERIFICAR EMAIL' para ativar sua conta.");
 	        
 	        // Remover tokens da resposta (já enviados via cookie)
@@ -174,17 +172,18 @@ public class AuthController {
 	@Operation(summary = "Renovar token", description = "Renova o access token usando um refresh token válido")
 	@ApiResponses({
 	    @ApiResponse(responseCode = "200", description = "Token renovado com sucesso"),
+	    @ApiResponse(responseCode = "400", description = "Refresh token não informado"),
 	    @ApiResponse(responseCode = "401", description = "Refresh token inválido"),
 	    @ApiResponse(responseCode = "429", description = "Rate limit excedido")
 	})
 	@RateLimit(RateLimit.EndpointType.CHECK)
 	@Auditable(eventType = "TOKEN_REFRESH", description = "Renovação de token de acesso")
 	public ResponseEntity<Map<String, Object>> refreshToken(
-	    @RequestBody Map<String, String> request,
+	    @RequestBody @Valid RefreshTokenRequestDTO body,
 	    HttpServletRequest httpRequest,
 	    HttpServletResponse response) {
 	    
-	    String refreshToken = request.get("refreshToken");
+	    String refreshToken = body.refreshToken();
 	    logger.info("Refresh token request");
 	    
 	    try {

@@ -8,6 +8,8 @@ import com.example.loginauthapi.infra.security.TokenService;
 import com.example.loginauthapi.infra.security.CustomUserDetailsService;
 import com.example.loginauthapi.dto.LoginRequestDTO;
 import com.example.loginauthapi.dto.RegisterRequestDTO;
+import com.example.loginauthapi.dto.UserResponseDTO;
+import com.example.loginauthapi.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,9 +27,11 @@ import com.example.loginauthapi.config.TestSecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -42,6 +46,9 @@ class AuthControllerIntegrationTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private UserService userService;
 
     @MockitoBean
     private TokenBlacklistService tokenBlacklistService;
@@ -59,8 +66,8 @@ class AuthControllerIntegrationTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         
-        // Mock default responses for cookie creation - garantir que nunca retorne null
-        when(authService.createAuthCookie(anyString(), any())).thenReturn(
+        // Mock default responses for cookie creation - any() para aceitar token null
+        when(authService.createAuthCookie(any(), any())).thenReturn(
             org.springframework.http.ResponseCookie.from("jwt", "mock-token")
                 .httpOnly(true)
                 .secure(false)
@@ -130,6 +137,20 @@ class AuthControllerIntegrationTest {
         }
 
     @Test
+    void login_WithInvalidDto_ShouldReturnBadRequest() throws Exception {
+        // Corpo inválido (email em branco): validação → 400; ou service rejeita → 401
+        when(authService.authenticateUser(argThat(dto -> dto != null && (dto.email() == null || dto.email().isBlank()))))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST, "Email é obrigatório"));
+        String invalidBody = "{\"email\":\"\",\"password\":\"any\"}";
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(invalidBody))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void login_WithInvalidCredentials_ShouldReturnUnauthorized() throws Exception {
         // Given
         LoginRequestDTO loginRequest = new LoginRequestDTO("invalid@example.com", "wrongpassword");
@@ -162,7 +183,9 @@ class AuthControllerIntegrationTest {
         mockUser.setRole(UserRole.UNVERIFIED);
         
         when(authService.registerUser(any(RegisterRequestDTO.class))).thenReturn(mockUser);
-        
+        when(userService.toUserResponseDTO(any(User.class))).thenReturn(new UserResponseDTO(
+            mockUser.getId().toString(), "Test User", "test@example.com", "UNVERIFIED", "pt-BR", null, java.util.List.of()));
+
         // Mock do TokenService para gerar tokens
         Map<String, String> mockTokenPair = new HashMap<>();
         mockTokenPair.put("accessToken", "mock-access-token");
@@ -207,6 +230,66 @@ class AuthControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(registerRequest)))
                 .andDo(print())
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_WithInvalidDtoValidation_ShouldReturnBadRequest() throws Exception {
+        // Nome ausente: binding ou validação → 400; stub para evitar NPE se controller for chamado
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "Dados inválidos"))
+                .when(authService).registerUser(argThat(dto -> dto == null || dto.name() == null || dto.name().isBlank()));
+        String invalidBody = "{\"name\":\"\",\"email\":\"a@b.com\",\"password\":\"Abc123!@#\",\"confirmPassword\":\"Abc123!@#\"}";
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(invalidBody))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void fullFlow_RegisterThenLoginThenRefresh_ShouldSucceed() throws Exception {
+        // Fluxo: register → login → refresh (todos com mocks)
+        RegisterRequestDTO registerRequest = new RegisterRequestDTO(
+            "Flow User", "flow@example.com", "Password123!", "Password123!"
+        );
+        User mockUser = new User();
+        mockUser.setId(UUID.randomUUID());
+        mockUser.setName("Flow User");
+        mockUser.setEmail("flow@example.com");
+        mockUser.setRole(UserRole.UNVERIFIED);
+        when(authService.registerUser(any(RegisterRequestDTO.class))).thenReturn(mockUser);
+        when(userService.toUserResponseDTO(any(User.class))).thenReturn(new UserResponseDTO(
+            mockUser.getId().toString(), "Flow User", "flow@example.com", "UNVERIFIED", "pt-BR", null, java.util.List.of()));
+
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+                .andExpect(status().isOk());
+
+        Map<String, Object> loginResponse = new HashMap<>();
+        loginResponse.put("user", new UserResponseDTO(mockUser.getId().toString(), "Flow User", "flow@example.com", "UNVERIFIED", "pt-BR", null, java.util.List.of()));
+        loginResponse.put("accessToken", "flow-access-token");
+        loginResponse.put("refreshToken", "flow-refresh-token");
+        when(authService.authenticateUser(any(LoginRequestDTO.class))).thenReturn(loginResponse);
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new LoginRequestDTO("flow@example.com", "Password123!"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user").exists());
+
+        Map<String, Object> refreshResponse = new HashMap<>();
+        refreshResponse.put("user", new UserResponseDTO(mockUser.getId().toString(), "Flow User", "flow@example.com", "UNVERIFIED", "pt-BR", null, java.util.List.of()));
+        refreshResponse.put("accessToken", "new-flow-access");
+        refreshResponse.put("refreshToken", "new-flow-refresh");
+        when(authService.refreshAccessToken(anyString())).thenReturn(refreshResponse);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"flow-refresh-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user").exists())
+                .andExpect(header().exists("Set-Cookie"));
     }
 
     @Test

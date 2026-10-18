@@ -7,10 +7,12 @@ import com.example.loginauthapi.domain.UserRole;
 import java.util.UUID;
 import com.example.loginauthapi.service.AuthService;
 import com.example.loginauthapi.service.TokenBlacklistService;
+import com.example.loginauthapi.service.UserService;
 import com.example.loginauthapi.infra.security.TokenService;
 import com.example.loginauthapi.infra.security.CustomUserDetailsService;
 import com.example.loginauthapi.dto.LoginRequestDTO;
 import com.example.loginauthapi.dto.RegisterRequestDTO;
+import com.example.loginauthapi.dto.UserResponseDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -36,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = AuthController.class)
 @Import(TestSecurityConfig.class)
+@ActiveProfiles("test")
 @WithMockUser
 class AuthControllerTest {
 
@@ -44,6 +48,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private UserService userService;
 
     @MockitoBean
     private TokenBlacklistService tokenBlacklistService;
@@ -169,7 +176,9 @@ class AuthControllerTest {
         mockUser.setRole(UserRole.UNVERIFIED);
         
         when(authService.registerUser(any(RegisterRequestDTO.class))).thenReturn(mockUser);
-        
+        when(userService.toUserResponseDTO(any(User.class))).thenReturn(new UserResponseDTO(
+            mockUser.getId().toString(), "Test User", "test@mail.com", "UNVERIFIED", "pt-BR", null, java.util.List.of()));
+
         // Mock do TokenService para gerar tokens
         Map<String, String> mockTokenPair = new HashMap<>();
         mockTokenPair.put("accessToken", "mock-access-token");

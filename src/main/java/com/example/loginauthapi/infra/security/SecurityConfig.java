@@ -25,6 +25,9 @@ public class SecurityConfig {
 	@Value("${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost,https://localhost}")
 	private String corsAllowedOrigins;
 
+	@Value("${app.security.hsts-enabled:false}")
+	private boolean hstsEnabled;
+
 	public SecurityConfig(SecurityFilter securityFilter) {
 		this.securityFilter = securityFilter;
 	}
@@ -60,9 +63,15 @@ public class SecurityConfig {
 			
 			// Headers de Segurança
 			.headers(headers -> headers
-				.frameOptions(frameOptions -> frameOptions.deny())  // Anti-clickjacking
-				.contentTypeOptions(contentTypeOptions -> {})  // Anti-MIME sniffing
-				.httpStrictTransportSecurity(hstsConfig -> hstsConfig.disable())  // HSTS desabilitado para desenvolvimento
+				.frameOptions(frameOptions -> frameOptions.deny())
+				.contentTypeOptions(contentTypeOptions -> {})
+				.httpStrictTransportSecurity(hsts -> {
+					if (hstsEnabled) {
+						hsts.maxAgeInSeconds(31536000).includeSubDomains(true);
+					} else {
+						hsts.disable();
+					}
+				})
 				.addHeaderWriter(new StaticHeadersWriter("X-XSS-Protection", "1; mode=block"))  // Anti-XSS
 				.addHeaderWriter(new StaticHeadersWriter("Referrer-Policy", "strict-origin-when-cross-origin"))  // Controle de referrer
 				.addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "geolocation=(), microphone=(), camera=()"))  // Controle de permissões
@@ -75,7 +84,7 @@ public class SecurityConfig {
 			
 			// Autorizações
 			.authorizeHttpRequests(authorize -> authorize
-				.requestMatchers("/auth/**").permitAll()
+				.requestMatchers("/api/auth/**").permitAll()
 				.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
 				.requestMatchers("OPTIONS", "/**").permitAll() // Permite todas as requisições OPTIONS
 				.anyRequest().authenticated()

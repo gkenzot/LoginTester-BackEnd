@@ -17,19 +17,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = UserController.class)
 @Import(TestSecurityConfig.class)
+@ActiveProfiles("test")
 class UserControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -56,20 +55,21 @@ class UserControllerTest {
     private UpdateUserDTO updateUserDTO;
     private UpdatePasswordDTO updatePasswordDTO;
 
+    private static final String TEST_USER_EMAIL = "test@mail.com";
+
     @BeforeEach
     void setUp() {
-        // Configurar contexto de segurança
-        Authentication auth = new UsernamePasswordAuthenticationToken("test@mail.com", null);
-        SecurityContextHolder.getContext().setAuthentication(auth);
-
         userResponse = new UserResponseDTO(
             "user-123",
             "Test User",
             "test@mail.com",
-            "USER"
+            "USER",
+            null,
+            null,
+            java.util.List.of()
         );
 
-        updateUserDTO = new UpdateUserDTO("Updated Name");
+        updateUserDTO = new UpdateUserDTO("Updated Name", null, null, null);
 
         updatePasswordDTO = new UpdatePasswordDTO(
             "currentPassword",
@@ -81,13 +81,12 @@ class UserControllerTest {
     // Testes de Get Current User (3 testes)
 
     @Test
-    @WithMockUser(username = "test@mail.com", authorities = {"ROLE_USER"})
     void getCurrentUser_WithValidAuthentication_ShouldReturnUser() throws Exception {
         // Given
-        when(userService.getCurrentUser("test@mail.com")).thenReturn(userResponse);
+        when(userService.getCurrentUser(TEST_USER_EMAIL)).thenReturn(userResponse);
 
-        // When & Then
-        mockMvc.perform(get("/api/user/me"))
+        // When & Then (autenticação via request post processor para /api/user/**)
+        mockMvc.perform(get("/api/user/me").with(user(TEST_USER_EMAIL).roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("user-123"))
                 .andExpect(jsonPath("$.name").value("Test User"))
@@ -98,23 +97,21 @@ class UserControllerTest {
     @Test
     void getCurrentUser_WithUserNotFound_ShouldReturnNotFound() throws Exception {
         // Given
-        when(userService.getCurrentUser("test@mail.com"))
+        when(userService.getCurrentUser(TEST_USER_EMAIL))
             .thenThrow(new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.NOT_FOUND, "User not found"));
+                org.springframework.http.HttpStatus.NOT_FOUND, "Usuário não encontrado"));
 
         // When & Then
-        mockMvc.perform(get("/api/user/me"))
+        mockMvc.perform(get("/api/user/me").with(user(TEST_USER_EMAIL).roles("USER")))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void getCurrentUser_WithNoAuthentication_ShouldReturnUnauthorized() throws Exception {
-        // Given
-        SecurityContextHolder.clearContext();
-
-        // When & Then
+        // Sem .with(user(...)): requisição não autenticada; /api/user/** exige authenticated()
+        // Spring Security retorna 403 Forbidden (recurso protegido, sem credenciais)
         mockMvc.perform(get("/api/user/me"))
-                .andExpect(status().isOk()); // Changed expectation since UserTestSecurityConfig permits all requests
+                .andExpect(status().isForbidden());
     }
 
     // Testes de Update User Info (4 testes)
@@ -125,13 +122,16 @@ class UserControllerTest {
         UserResponseDTO updatedResponse = new UserResponseDTO(
             "user-123",
             "Updated Name",
-            "test@mail.com",
-            "USER"
+            TEST_USER_EMAIL,
+            "USER",
+            null,
+            null,
+            java.util.List.of()
         );
-        when(userService.updateUserInfo("test@mail.com", updateUserDTO)).thenReturn(updatedResponse);
+        when(userService.updateUserInfo(TEST_USER_EMAIL, updateUserDTO)).thenReturn(updatedResponse);
 
         // When & Then
-        mockMvc.perform(patch("/api/user/me")
+        mockMvc.perform(patch("/api/user/me").with(user(TEST_USER_EMAIL).roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateUserDTO)))
                 .andExpect(status().isOk())
@@ -141,13 +141,13 @@ class UserControllerTest {
     @Test
     void updateUserInfo_WithEmptyName_ShouldReturnBadRequest() throws Exception {
         // Given
-        UpdateUserDTO emptyNameDTO = new UpdateUserDTO("");
-        when(userService.updateUserInfo("test@mail.com", emptyNameDTO))
+        UpdateUserDTO emptyNameDTO = new UpdateUserDTO("", null, null, null);
+        when(userService.updateUserInfo(TEST_USER_EMAIL, emptyNameDTO))
             .thenThrow(new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.BAD_REQUEST, "Name cannot be empty"));
+                org.springframework.http.HttpStatus.BAD_REQUEST, "O nome não pode estar vazio"));
 
         // When & Then
-        mockMvc.perform(patch("/api/user/me")
+        mockMvc.perform(patch("/api/user/me").with(user(TEST_USER_EMAIL).roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(emptyNameDTO)))
                 .andExpect(status().isBadRequest());
@@ -156,13 +156,13 @@ class UserControllerTest {
     @Test
     void updateUserInfo_WithNullName_ShouldReturnBadRequest() throws Exception {
         // Given
-        UpdateUserDTO nullNameDTO = new UpdateUserDTO(null);
-        when(userService.updateUserInfo("test@mail.com", nullNameDTO))
+        UpdateUserDTO nullNameDTO = new UpdateUserDTO(null, null, null, null);
+        when(userService.updateUserInfo(TEST_USER_EMAIL, nullNameDTO))
             .thenThrow(new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.BAD_REQUEST, "Name cannot be empty"));
+                org.springframework.http.HttpStatus.BAD_REQUEST, "O nome não pode estar vazio"));
 
         // When & Then
-        mockMvc.perform(patch("/api/user/me")
+        mockMvc.perform(patch("/api/user/me").with(user(TEST_USER_EMAIL).roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(nullNameDTO)))
                 .andExpect(status().isBadRequest());
@@ -170,8 +170,8 @@ class UserControllerTest {
 
     @Test
     void updateUserInfo_WithInvalidJson_ShouldReturnBadRequest() throws Exception {
-        // When & Then
-        mockMvc.perform(patch("/api/user/me")
+        // When & Then (auth necessária para atingir o controller; validação de JSON retorna 400)
+        mockMvc.perform(patch("/api/user/me").with(user(TEST_USER_EMAIL).roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("invalid json"))
                 .andExpect(status().isBadRequest());
@@ -182,10 +182,10 @@ class UserControllerTest {
     @Test
     void updatePassword_WithValidData_ShouldReturnNoContent() throws Exception {
         // Given
-        doNothing().when(userService).updatePassword("test@mail.com", updatePasswordDTO);
+        doNothing().when(userService).updatePassword(TEST_USER_EMAIL, updatePasswordDTO);
 
         // When & Then
-        mockMvc.perform(patch("/api/user/me/password")
+        mockMvc.perform(patch("/api/user/me/password").with(user(TEST_USER_EMAIL).roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePasswordDTO)))
                 .andExpect(status().isNoContent());
@@ -195,11 +195,11 @@ class UserControllerTest {
     void updatePassword_WithIncorrectCurrentPassword_ShouldReturnUnauthorized() throws Exception {
         // Given
         doThrow(new org.springframework.web.server.ResponseStatusException(
-            org.springframework.http.HttpStatus.UNAUTHORIZED, "Current password is incorrect"))
-            .when(userService).updatePassword("test@mail.com", updatePasswordDTO);
+            org.springframework.http.HttpStatus.UNAUTHORIZED, "Senha atual incorreta"))
+            .when(userService).updatePassword(TEST_USER_EMAIL, updatePasswordDTO);
 
         // When & Then
-        mockMvc.perform(patch("/api/user/me/password")
+        mockMvc.perform(patch("/api/user/me/password").with(user(TEST_USER_EMAIL).roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePasswordDTO)))
                 .andExpect(status().isUnauthorized());
@@ -214,11 +214,11 @@ class UserControllerTest {
             "differentPassword123!"
         );
         doThrow(new org.springframework.web.server.ResponseStatusException(
-            org.springframework.http.HttpStatus.BAD_REQUEST, "New password and confirmation do not match"))
-            .when(userService).updatePassword("test@mail.com", mismatchPasswordDTO);
+            org.springframework.http.HttpStatus.BAD_REQUEST, "Nova senha e confirmação não coincidem"))
+            .when(userService).updatePassword(TEST_USER_EMAIL, mismatchPasswordDTO);
 
         // When & Then
-        mockMvc.perform(patch("/api/user/me/password")
+        mockMvc.perform(patch("/api/user/me/password").with(user(TEST_USER_EMAIL).roles("USER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mismatchPasswordDTO)))
                 .andExpect(status().isBadRequest());

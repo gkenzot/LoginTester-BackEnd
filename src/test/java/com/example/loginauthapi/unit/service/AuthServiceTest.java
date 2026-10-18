@@ -1,14 +1,18 @@
 package com.example.loginauthapi.unit.service;
 
+import com.example.loginauthapi.domain.AccessFlag;
 import com.example.loginauthapi.domain.User;
 import com.example.loginauthapi.domain.UserRole;
 import com.example.loginauthapi.dto.LoginRequestDTO;
 import com.example.loginauthapi.dto.RegisterRequestDTO;
+import com.example.loginauthapi.dto.UserResponseDTO;
 import com.example.loginauthapi.repositories.UserRepository;
 import com.example.loginauthapi.service.AuthService;
 import com.example.loginauthapi.service.AuditService;
 import com.example.loginauthapi.service.AlertRulesEngine;
+import com.example.loginauthapi.service.PasswordValidator;
 import com.example.loginauthapi.service.TokenBlacklistService;
+import com.example.loginauthapi.service.UserService;
 import com.example.loginauthapi.infra.security.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
@@ -52,6 +57,12 @@ class AuthServiceTest {
     private AlertRulesEngine alertRulesEngine;
 
     @Mock
+    private PasswordValidator passwordValidator;
+
+    @Mock
+    private UserService userService;
+
+    @Mock
     private HttpServletRequest request;
 
     @InjectMocks
@@ -69,6 +80,7 @@ class AuthServiceTest {
         testUser.setName("Test User");
         testUser.setPassword("encodedPassword");
         testUser.setRole(UserRole.USER);
+        testUser.getAccessFlags().clear();
 
         loginRequest = new LoginRequestDTO("test@mail.com", "password123");
 
@@ -91,6 +103,8 @@ class AuthServiceTest {
             "accessToken", "access-token",
             "refreshToken", "refresh-token"
         ));
+        when(userService.toUserResponseDTO(testUser)).thenReturn(new UserResponseDTO(
+            testUser.getId().toString(), "Test User", "test@mail.com", "USER", "pt-BR", null, java.util.List.of()));
 
         // When
         Map<String, Object> result = authService.authenticateUser(loginRequest);
@@ -144,6 +158,8 @@ class AuthServiceTest {
             "accessToken", "access-token",
             "refreshToken", "refresh-token"
         ));
+        when(userService.toUserResponseDTO(testUser)).thenReturn(new UserResponseDTO(
+            testUser.getId().toString(), "Test User", "test@mail.com", "USER", "pt-BR", null, java.util.List.of()));
 
         // When
         Map<String, Object> result = authService.authenticateUserWithAudit(loginRequest, ipAddress, userAgent);
@@ -216,13 +232,15 @@ class AuthServiceTest {
 
     @Test
     void registerUser_WithWeakPassword_ShouldThrowBadRequest() {
-        // Given
+        // Given: PasswordValidator (mock) deve rejeitar senha fraca
         RegisterRequestDTO weakPasswordRequest = new RegisterRequestDTO(
             "New User",
             "new@mail.com",
             "123",
             "123"
         );
+        doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha não atende aos critérios de segurança"))
+            .when(passwordValidator).validate("123");
 
         // When & Then
         assertThatThrownBy(() -> authService.registerUser(weakPasswordRequest))
@@ -316,5 +334,63 @@ class AuthServiceTest {
         assertThat(cookie.getValue()).isEqualTo("");
         assertThat(cookie.isHttpOnly()).isTrue();
         assertThat(cookie.getMaxAge().getSeconds()).isEqualTo(0);
+    }
+
+    // Testes de validateAccessByFlag (acesso por flag 001)
+
+    @Test
+    void validateAccessByFlag_WhenAdmin_ShouldNotThrow() {
+        User adminUser = new User();
+        adminUser.setId(UUID.randomUUID());
+        adminUser.setEmail("admin@mail.com");
+        adminUser.setName("Admin");
+        adminUser.setPassword("encoded");
+        adminUser.setRole(UserRole.ADMIN);
+        adminUser.getAccessFlags().clear();
+
+        when(tokenService.validateToken("valid-token")).thenReturn("admin@mail.com");
+        when(userRepository.findByEmail("admin@mail.com")).thenReturn(Optional.of(adminUser));
+
+        assertThatCode(() -> authService.validateAccessByFlag("valid-token", AccessFlag.MANAGE_USERS_AND_FLAGS))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateAccessByFlag_WhenUserWithFlag001_ShouldNotThrow() {
+        testUser.getAccessFlags().add(AccessFlag.MANAGE_USERS_AND_FLAGS);
+        when(tokenService.validateToken("valid-token")).thenReturn("test@mail.com");
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(testUser));
+
+        assertThatCode(() -> authService.validateAccessByFlag("valid-token", AccessFlag.MANAGE_USERS_AND_FLAGS))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateAccessByFlag_WhenUserWithoutFlag001_ShouldThrow403() {
+        testUser.getAccessFlags().clear();
+        when(tokenService.validateToken("valid-token")).thenReturn("test@mail.com");
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(testUser));
+
+        assertThatThrownBy(() -> authService.validateAccessByFlag("valid-token", AccessFlag.MANAGE_USERS_AND_FLAGS))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasFieldOrPropertyWithValue("status", HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void validateAccessByFlag_WhenUnverified_ShouldThrow403() {
+        User unverified = new User();
+        unverified.setId(UUID.randomUUID());
+        unverified.setEmail("unv@mail.com");
+        unverified.setName("Unverified");
+        unverified.setPassword("encoded");
+        unverified.setRole(UserRole.UNVERIFIED);
+        unverified.getAccessFlags().add(AccessFlag.MANAGE_USERS_AND_FLAGS);
+
+        when(tokenService.validateToken("valid-token")).thenReturn("unv@mail.com");
+        when(userRepository.findByEmail("unv@mail.com")).thenReturn(Optional.of(unverified));
+
+        assertThatThrownBy(() -> authService.validateAccessByFlag("valid-token", AccessFlag.MANAGE_USERS_AND_FLAGS))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasFieldOrPropertyWithValue("status", HttpStatus.FORBIDDEN);
     }
 }

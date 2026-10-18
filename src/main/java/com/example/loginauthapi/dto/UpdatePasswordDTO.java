@@ -7,16 +7,16 @@ import jakarta.validation.constraints.Size;
 
 public record UpdatePasswordDTO(
 	@Schema(description = "Senha atual", example = "123456")
-    @NotBlank(message = "Current password cannot be blank")
+    @NotBlank(message = "Senha atual é obrigatória")
     String currentPassword,
     
     @Schema(description = "Senha nova 01", example = "abcdef")
-    @NotBlank(message = "New password cannot be blank")
-    @Size(min = 8, message = "New password must be at least 8 characters long")
+    @NotBlank(message = "Nova senha é obrigatória")
+    @Size(min = 8, message = "Nova senha deve ter pelo menos 8 caracteres")
     String newPassword,
     
     @Schema(description = "Senha nova 02", example = "abcdef")
-    @NotBlank(message = "Password confirmation cannot be blank")
+    @NotBlank(message = "Confirmação de senha é obrigatória")
     String confirmPassword
 ) {
     public boolean passwordsMatch() {

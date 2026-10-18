@@ -6,11 +6,11 @@ import com.example.loginauthapi.dto.UpdatePasswordDTO;
 import com.example.loginauthapi.dto.UpdateUserDTO;
 import com.example.loginauthapi.dto.UserResponseDTO;
 import com.example.loginauthapi.repositories.UserRepository;
+import com.example.loginauthapi.service.PasswordValidator;
 import com.example.loginauthapi.service.UserServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -33,7 +33,9 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    @InjectMocks
+    @Mock
+    private PasswordValidator passwordValidator;
+
     private UserServiceImpl userService;
 
     private User testUser;
@@ -42,6 +44,13 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
+        userService = new UserServiceImpl(
+            userRepository,
+            passwordEncoder,
+            passwordValidator,
+            "uploads/profile-photos",
+            2097152L
+        );
         testUser = new User();
         testUser.setId(UUID.randomUUID());
         testUser.setEmail("test@mail.com");
@@ -49,7 +58,7 @@ class UserServiceTest {
         testUser.setPassword("encodedPassword");
         testUser.setRole(UserRole.USER);
 
-        updateUserDTO = new UpdateUserDTO("Updated Name");
+        updateUserDTO = new UpdateUserDTO("Updated Name", null, null, null);
 
         updatePasswordDTO = new UpdatePasswordDTO(
             "currentPassword",
@@ -85,7 +94,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.getCurrentUser("nonexistent@mail.com"))
             .isInstanceOf(ResponseStatusException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.NOT_FOUND)
-            .hasMessageContaining("User not found");
+            .hasMessageContaining("Usuário não encontrado");
     }
 
     @Test
@@ -97,7 +106,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.getCurrentUser(null))
             .isInstanceOf(ResponseStatusException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.NOT_FOUND)
-            .hasMessageContaining("User not found");
+            .hasMessageContaining("Usuário não encontrado");
     }
 
     // Testes de Atualização de Informações (4 testes)
@@ -121,37 +130,68 @@ class UserServiceTest {
     @Test
     void updateUserInfo_WithEmptyName_ShouldThrowBadRequest() {
         // Given
-        UpdateUserDTO emptyNameDTO = new UpdateUserDTO("");
+        UpdateUserDTO emptyNameDTO = new UpdateUserDTO("", null, null, null);
 
         // When & Then
         assertThatThrownBy(() -> userService.updateUserInfo("test@mail.com", emptyNameDTO))
             .isInstanceOf(ResponseStatusException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.BAD_REQUEST)
-            .hasMessageContaining("Name cannot be empty");
+            .hasMessageContaining("O nome não pode estar vazio");
     }
 
     @Test
     void updateUserInfo_WithNullName_ShouldThrowBadRequest() {
         // Given
-        UpdateUserDTO nullNameDTO = new UpdateUserDTO(null);
+        UpdateUserDTO nullNameDTO = new UpdateUserDTO(null, null, null, null);
 
         // When & Then
         assertThatThrownBy(() -> userService.updateUserInfo("test@mail.com", nullNameDTO))
             .isInstanceOf(ResponseStatusException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.BAD_REQUEST)
-            .hasMessageContaining("Name cannot be empty");
+            .hasMessageContaining("O nome não pode estar vazio");
     }
 
     @Test
     void updateUserInfo_WithWhitespaceOnlyName_ShouldThrowBadRequest() {
         // Given
-        UpdateUserDTO whitespaceNameDTO = new UpdateUserDTO("   ");
+        UpdateUserDTO whitespaceNameDTO = new UpdateUserDTO("   ", null, null, null);
 
         // When & Then
         assertThatThrownBy(() -> userService.updateUserInfo("test@mail.com", whitespaceNameDTO))
             .isInstanceOf(ResponseStatusException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.BAD_REQUEST)
-            .hasMessageContaining("Name cannot be empty");
+            .hasMessageContaining("O nome não pode estar vazio");
+    }
+
+    @Test
+    void updateUserInfo_WithValidPreferredLanguage_ShouldUpdateLanguage() {
+        // Given
+        testUser.setPreferredLanguage("pt-BR");
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateUserDTO dto = new UpdateUserDTO("Updated Name", null, null, "en-US");
+
+        // When
+        UserResponseDTO result = userService.updateUserInfo("test@mail.com", dto);
+
+        // Then
+        assertThat(result.preferredLanguage()).isEqualTo("en-US");
+        assertThat(testUser.getPreferredLanguage()).isEqualTo("en-US");
+    }
+
+    @Test
+    void updateUserInfo_WithInvalidPreferredLanguage_ShouldThrowBadRequest() {
+        // Given
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(testUser));
+
+        UpdateUserDTO dto = new UpdateUserDTO("Updated Name", null, null, "es-ES");
+
+        // When & Then
+        assertThatThrownBy(() -> userService.updateUserInfo("test@mail.com", dto))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasFieldOrPropertyWithValue("status", HttpStatus.BAD_REQUEST)
+            .hasMessageContaining("Idioma inválido. Use: pt-BR ou en-US");
     }
 
     // Testes de Atualização de Senha (3 testes)
@@ -189,7 +229,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updatePassword("test@mail.com", wrongCurrentPasswordDTO))
             .isInstanceOf(ResponseStatusException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED)
-            .hasMessageContaining("Current password is incorrect");
+            .hasMessageContaining("Senha atual incorreta");
     }
 
     @Test
@@ -205,6 +245,6 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updatePassword("test@mail.com", mismatchPasswordDTO))
             .isInstanceOf(ResponseStatusException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.BAD_REQUEST)
-            .hasMessageContaining("New password and confirmation do not match");
+            .hasMessageContaining("Nova senha e confirmação não coincidem");
     }
 }

@@ -158,7 +158,7 @@ public class AuditAspect {
         metadata.put("className", signature.getMethod().getDeclaringClass().getSimpleName());
         metadata.put("methodName", signature.getMethod().getName());
         metadata.put("executionTime", System.currentTimeMillis() - startTime);
-        metadata.put("timestamp", LocalDateTime.now());
+        metadata.put("timestamp", LocalDateTime.now().toString());
 
         if (auditable.includeParameters()) {
             Object[] args = joinPoint.getArgs();

@@ -24,9 +24,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class TokenService {
-    
+
+    private static final String JWT_ISSUER = "login-auth-api";
+    private static final String CLAIM_TYPE_ACCESS = "access";
+    private static final String CLAIM_TYPE_REFRESH = "refresh";
+
     private static final Logger logger = LoggerFactory.getLogger(TokenService.class);
-    
+
     private final TokenBlacklistService tokenBlacklistService;
     private final JwtProperties jwtProperties;
     
@@ -38,9 +42,9 @@ public class TokenService {
             Instant expirationDate = genAccessTokenExpirationDate();
             
             String token = JWT.create()
-                .withIssuer("login-auth-api")
+                .withIssuer(JWT_ISSUER)
                 .withSubject(user.getEmail())
-                .withClaim("type", "access")
+                .withClaim("type", CLAIM_TYPE_ACCESS)
                 .withClaim("userId", user.getId().toString())
                 .withExpiresAt(expirationDate)
                 .sign(algorithm);
@@ -65,9 +69,9 @@ public class TokenService {
             String tokenId = UUID.randomUUID().toString();
             
             String refreshToken = JWT.create()
-                .withIssuer("login-auth-api")
+                .withIssuer(JWT_ISSUER)
                 .withSubject(user.getEmail())
-                .withClaim("type", "refresh")
+                .withClaim("type", CLAIM_TYPE_REFRESH)
                 .withClaim("userId", user.getId().toString())
                 .withClaim("tokenId", tokenId)
                 .withExpiresAt(expirationDate)
@@ -107,13 +111,12 @@ public class TokenService {
             Algorithm algorithm = Algorithm.HMAC256(jwtProperties.getSecretKey());
             
             DecodedJWT decodedJWT = JWT.require(algorithm)
-                .withIssuer("login-auth-api")
+                .withIssuer(JWT_ISSUER)
                 .build()
                 .verify(token);
-            
-            // Verificar se é um access token
+
             String tokenType = decodedJWT.getClaim("type").asString();
-            if (!"access".equals(tokenType)) {
+            if (!CLAIM_TYPE_ACCESS.equals(tokenType)) {
                 logger.debug("Invalid token type: {}", tokenType);
                 return "";
             }
@@ -143,13 +146,12 @@ public class TokenService {
             Algorithm algorithm = Algorithm.HMAC256(jwtProperties.getSecretKey());
             
             DecodedJWT decodedJWT = JWT.require(algorithm)
-                .withIssuer("login-auth-api")
+                .withIssuer(JWT_ISSUER)
                 .build()
                 .verify(refreshToken);
-            
-            // Verificar se é um refresh token
+
             String tokenType = decodedJWT.getClaim("type").asString();
-            if (!"refresh".equals(tokenType)) {
+            if (!CLAIM_TYPE_REFRESH.equals(tokenType)) {
                 logger.debug("Invalid refresh token type: {}", tokenType);
                 return "";
             }

@@ -2,6 +2,7 @@ package com.example.loginauthapi.service;
 
 import com.example.loginauthapi.domain.User;
 import com.example.loginauthapi.dto.LoginRequestDTO;
+import org.springframework.beans.factory.annotation.Value;
 import com.example.loginauthapi.dto.RegisterRequestDTO;
 import com.example.loginauthapi.repositories.UserRepository;
 import com.example.loginauthapi.infra.security.TokenService;
@@ -16,10 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class AuthService {
@@ -27,16 +29,21 @@ public class AuthService {
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
     
     private final UserRepository userRepository;
+    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordValidator passwordValidator;
     private final TokenService tokenService;
     private final TokenBlacklistService tokenBlacklistService;
     private final AuditService auditService;
     private final AlertRulesEngine alertRulesEngine;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, TokenService tokenService, 
+    public AuthService(UserRepository userRepository, UserService userService, PasswordEncoder passwordEncoder,
+                      PasswordValidator passwordValidator, TokenService tokenService,
                       TokenBlacklistService tokenBlacklistService, AuditService auditService, AlertRulesEngine alertRulesEngine) {
         this.userRepository = userRepository;
+        this.userService = userService;
         this.passwordEncoder = passwordEncoder;
+        this.passwordValidator = passwordValidator;
         this.tokenService = tokenService;
         this.tokenBlacklistService = tokenBlacklistService;
         this.auditService = auditService;
@@ -90,12 +97,7 @@ public class AuthService {
             alertRulesEngine.evaluateLoginAttempts(ipAddress, loginRequest.email(), true, userAgent);
 
             Map<String, Object> result = new HashMap<>();
-            Map<String, Object> userInfo = new HashMap<>();
-            userInfo.put("id", user.getId());
-            userInfo.put("email", user.getEmail());
-            userInfo.put("name", user.getName());
-            userInfo.put("role", user.getRole().name());
-            result.put("user", userInfo);
+            result.put("user", userService.toUserResponseDTO(user));
             result.put("accessToken", tokenPair.get("accessToken"));
             result.put("refreshToken", tokenPair.get("refreshToken"));
             result.put("message", "Login realizado com sucesso");
@@ -162,7 +164,7 @@ public class AuthService {
             }
             
             // Validação adicional de força da senha
-            validatePasswordStrength(registerRequest.password());
+            passwordValidator.validate(registerRequest.password());
             
             // Verifica se o email já está cadastrado
             if (userRepository.findByEmail(registerRequest.email()).isPresent()) {
@@ -195,62 +197,6 @@ public class AuthService {
         }
     }
     
-    /**
-     * Valida a força da senha com critérios específicos
-     */
-    private void validatePasswordStrength(String password) {
-        List<String> errors = new ArrayList<>();
-        
-        if (password == null || password.trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha é obrigatória");
-        }
-        
-        if (password.length() < 8) {
-            errors.add("Senha deve ter pelo menos 8 caracteres");
-        }
-        
-        if (password.length() > 128) {
-            errors.add("Senha deve ter no máximo 128 caracteres");
-        }
-        
-        if (!password.matches(".*[a-z].*")) {
-            errors.add("Senha deve conter pelo menos uma letra minúscula");
-        }
-        
-        if (!password.matches(".*[A-Z].*")) {
-            errors.add("Senha deve conter pelo menos uma letra maiúscula");
-        }
-        
-        if (!password.matches(".*\\d.*")) {
-            errors.add("Senha deve conter pelo menos um número");
-        }
-        
-        if (!password.matches(".*[@$!%*?&].*")) {
-            errors.add("Senha deve conter pelo menos um símbolo especial (@$!%*?&)");
-        }
-        
-        // Verifica se contém apenas espaços em branco
-        if (password.trim().isEmpty()) {
-            errors.add("Senha não pode conter apenas espaços");
-        }
-        
-        // Verifica senhas comuns fracas
-        String[] commonPasswords = {"123456", "password", "123456789", "12345678", "12345", 
-                                   "1234567", "1234567890", "qwerty", "abc123", "password123"};
-        for (String common : commonPasswords) {
-            if (password.toLowerCase().contains(common.toLowerCase())) {
-                errors.add("Senha muito comum. Escolha uma senha mais segura");
-                break;
-            }
-        }
-        
-        if (!errors.isEmpty()) {
-            String errorMessage = "Senha não atende aos critérios de segurança: " + String.join(", ", errors);
-            logger.warn("Password validation failed: {}", errorMessage);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
-        }
-    }
-
     /**
      * Verifica se um token é válido e retorna os dados do usuário
      */
@@ -290,6 +236,8 @@ public class AuthService {
             result.put("authenticated", true);
             result.put("user", userEmail);
             result.put("role", user.getRole().name());
+            result.put("accessFlags", accessFlagsToList(user.getAccessFlags()));
+            result.put("preferredLanguage", user.getPreferredLanguage() != null && !user.getPreferredLanguage().isBlank() ? user.getPreferredLanguage() : "pt-BR");
             return result;
             
         } catch (ResponseStatusException e) {
@@ -308,15 +256,55 @@ public class AuthService {
     }
 
     /**
-     * Cria um cookie de logout (expira imediatamente)
+     * Valida acesso por flag: ADMIN sempre permite; USER só se tiver a flag; UNVERIFIED nega.
+     * @param token JWT (cookie ou header)
+     * @param requiredFlag código da flag exigida (ex: "USER_MANAGE")
+     * @throws ResponseStatusException 401 se não autenticado, 403 se sem permissão
+     */
+    @Transactional(readOnly = true)
+    public void validateAccessByFlag(String token, String requiredFlag) {
+        Map<String, Object> authResult = validateTokenAndGetUser(token);
+        Boolean authenticated = (Boolean) authResult.get("authenticated");
+        if (!Boolean.TRUE.equals(authenticated)) {
+            logger.warn("Access by flag denied: not authenticated");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                authResult.get("message") != null ? authResult.get("message").toString() : "Token inválido ou expirado");
+        }
+        String role = (String) authResult.get("role");
+        if ("ADMIN".equals(role)) {
+            logger.debug("Access by flag allowed: ADMIN");
+            return;
+        }
+        if ("USER".equals(role)) {
+            @SuppressWarnings("unchecked")
+            List<String> accessFlags = (List<String>) authResult.get("accessFlags");
+            if (accessFlags != null && accessFlags.contains(requiredFlag)) {
+                logger.debug("Access by flag allowed: USER with flag {}", requiredFlag);
+                return;
+            }
+            logger.warn("Access by flag denied: USER without flag {}", requiredFlag);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Acesso negado - permissão (flag " + requiredFlag + ") necessária");
+        }
+        logger.warn("Access by flag denied: role {} (UNVERIFIED or other)", role);
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+            "Acesso negado - apenas ADMIN ou USER com a permissão correspondente podem acessar");
+    }
+
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
+
+    /**
+     * Cria um cookie de logout (expira imediatamente).
+     * Em produção (HTTPS), configurar app.cookie.secure=true.
      */
     public ResponseCookie createLogoutCookie() {
         return ResponseCookie.from("jwt", "")
             .httpOnly(true)
-            .secure(false) // Simplificado para desenvolvimento
+            .secure(cookieSecure)
             .path("/")
-            .maxAge(0) // Expira imediatamente
-            .sameSite("Lax") // Simplificado para desenvolvimento
+            .maxAge(0)
+            .sameSite("Lax")
             .build();
     }
     
@@ -394,12 +382,7 @@ public class AuthService {
             logger.info("Access token refreshed successfully for user: {}", user.getEmail());
             
             Map<String, Object> result = new HashMap<>();
-            Map<String, Object> userInfo = new HashMap<>();
-            userInfo.put("id", user.getId());
-            userInfo.put("email", user.getEmail());
-            userInfo.put("name", user.getName());
-            userInfo.put("role", user.getRole().name());
-            result.put("user", userInfo);
+            result.put("user", userService.toUserResponseDTO(user));
             result.put("accessToken", tokenPair.get("accessToken"));
             result.put("refreshToken", tokenPair.get("refreshToken"));
             result.put("message", "Token renovado com sucesso");
@@ -413,5 +396,12 @@ public class AuthService {
             throw new ResponseStatusException(
                 HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno do servidor");
         }
+    }
+
+    private static List<String> accessFlagsToList(Set<String> accessFlags) {
+        if (accessFlags == null) {
+            return List.of();
+        }
+        return new ArrayList<>(accessFlags);
     }
 }

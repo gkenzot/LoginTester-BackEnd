@@ -3,22 +3,26 @@ package com.example.loginauthapi.integration.repository;
 import com.example.loginauthapi.domain.User;
 import com.example.loginauthapi.domain.UserRole;
 import com.example.loginauthapi.repositories.UserRepository;
+import com.example.loginauthapi.config.TestDatabaseConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 
 @DataJpaTest
 @ActiveProfiles("test")
+@Import(TestDatabaseConfig.class)
 class UserRepositoryTest {
 
     @Autowired
@@ -37,7 +41,7 @@ class UserRepositoryTest {
     @DisplayName("Should persist a user successfully")
     void save_WithValidUser_ShouldPersistUser() {
         // Given
-        User user = new User(null, "Test User", "test@example.com", "password123", UserRole.USER);
+        User user = new User(null, "Test User", "test@example.com", "password123", UserRole.USER, Set.of(), null, "pt-BR");
 
         // When
         User savedUser = userRepository.save(user);
@@ -55,7 +59,7 @@ class UserRepositoryTest {
     @DisplayName("Should find user by ID successfully")
     void findById_WithExistingId_ShouldReturnUser() {
         // Given
-        User user = new User(null, "Test User", "test@example.com", "password123", UserRole.USER);
+        User user = new User(null, "Test User", "test@example.com", "password123", UserRole.USER, Set.of(), null, "pt-BR");
         entityManager.persistAndFlush(user);
 
         // When
@@ -80,7 +84,7 @@ class UserRepositoryTest {
     @DisplayName("Should find user by email successfully")
     void findByEmail_WithExistingEmail_ShouldReturnUser() {
         // Given
-        User testUser = new User(null, "Test User", "test@example.com", "password123", UserRole.USER);
+        User testUser = new User(null, "Test User", "test@example.com", "password123", UserRole.USER, Set.of(), null, "pt-BR");
         userRepository.save(testUser);
 
         // When
@@ -105,7 +109,7 @@ class UserRepositoryTest {
     @DisplayName("Should update an existing user successfully")
     void update_WithExistingUser_ShouldUpdateUser() {
         // Given
-        User user = new User(null, "Original Name", "update@example.com", "oldpass", UserRole.USER);
+        User user = new User(null, "Original Name", "update@example.com", "oldpass", UserRole.USER, Set.of(), null, "pt-BR");
         entityManager.persistAndFlush(user);
         entityManager.clear(); // Detach the entity
 
@@ -126,7 +130,7 @@ class UserRepositoryTest {
     @DisplayName("Should delete a user successfully")
     void delete_WithExistingUser_ShouldRemoveUser() {
         // Given
-        User testUser = new User(null, "Test User", "test@example.com", "password123", UserRole.USER);
+        User testUser = new User(null, "Test User", "test@example.com", "password123", UserRole.USER, Set.of(), null, "pt-BR");
         User savedUser = userRepository.save(testUser);
 
         // When
@@ -141,8 +145,8 @@ class UserRepositoryTest {
     @DisplayName("Should find all users successfully")
     void findAll_WithMultipleUsers_ShouldReturnAllUsers() {
         // Given
-        User testUser1 = new User(null, "Test User 1", "test1@example.com", "password123", UserRole.USER);
-        User testUser2 = new User(null, "Test User 2", "test2@example.com", "password123", UserRole.ADMIN);
+        User testUser1 = new User(null, "Test User 1", "test1@example.com", "password123", UserRole.USER, Set.of(), null, "pt-BR");
+        User testUser2 = new User(null, "Test User 2", "test2@example.com", "password123", UserRole.ADMIN, Set.of(), null, "pt-BR");
         userRepository.save(testUser1);
         userRepository.save(testUser2);
 
@@ -167,8 +171,8 @@ class UserRepositoryTest {
     @DisplayName("Should not save user with duplicate email")
     void save_WithDuplicateEmail_ShouldThrowException() {
         // Given
-        User testUser1 = new User(null, "Test User 1", "test@example.com", "password123", UserRole.USER);
-        User testUser2 = new User(null, "Test User 2", "test@example.com", "anotherpass", UserRole.USER);
+        User testUser1 = new User(null, "Test User 1", "test@example.com", "password123", UserRole.USER, Set.of(), null, "pt-BR");
+        User testUser2 = new User(null, "Test User 2", "test@example.com", "anotherpass", UserRole.USER, Set.of(), null, "pt-BR");
         
         // Save first user
         userRepository.save(testUser1);

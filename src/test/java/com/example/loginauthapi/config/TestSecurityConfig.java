@@ -17,8 +17,8 @@ public class TestSecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/auth/**").permitAll()
-                .requestMatchers("/user/**").authenticated()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/user/**").authenticated()
                 .anyRequest().permitAll()
             )
             .httpBasic(httpBasic -> httpBasic.disable())
